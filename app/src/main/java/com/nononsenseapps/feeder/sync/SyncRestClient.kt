@@ -13,6 +13,7 @@ import com.nononsenseapps.feeder.db.room.RemoteFeed
 import com.nononsenseapps.feeder.db.room.SyncDevice
 import com.nononsenseapps.feeder.db.room.SyncRemote
 import com.nononsenseapps.feeder.db.room.generateDeviceName
+import com.nononsenseapps.feeder.model.OPMLParserHandler
 import com.nononsenseapps.feeder.util.Either
 import com.nononsenseapps.feeder.util.logDebug
 import kotlinx.coroutines.runBlocking
@@ -29,11 +30,13 @@ class SyncRestClient(
 ) : DIAware {
     private val repository: Repository by instance()
     private val okHttpClient: OkHttpClient by instance()
+    private val opmlParserHandler: OPMLParserHandler by instance()
     private var feederSync: FeederSync? = null
     private var secretKey: SecretKeys? = null
     private val moshi = getMoshi()
     private val readMarkAdapter = moshi.adapter<ReadMarkContent>()
     private val feedsAdapter = moshi.adapter<EncryptedFeeds>()
+    private val settingsAdapter = moshi.adapter<EncryptedSettings>()
 
     init {
         runBlocking {
@@ -416,6 +419,9 @@ class SyncRestClient(
     }
 
     internal suspend fun getFeeds() {
+        if (!repository.syncFeedsEnabled.value) {
+            return
+        }
         try {
             safeBlock { syncRemote, feederSync, secretKey ->
                 logDebug(LOG_TAG, "getFeeds")
@@ -459,14 +465,63 @@ class SyncRestClient(
         }
     }
 
+    internal suspend fun getSettings() {
+        if (!repository.syncSettingsEnabled.value) {
+            return
+        }
+        try {
+            safeBlock { syncRemote, feederSync, secretKey ->
+                logDebug(LOG_TAG, "getSettings")
+                feederSync
+                    .getSettings(
+                        syncChainId = syncRemote.syncChainId,
+                        currentDeviceId = syncRemote.deviceId,
+                    ).toEither()
+                    .onRight { response ->
+                        logDebug(LOG_TAG, "GetSettings response hash: ${response.hash}")
+
+                        if (response.hash == syncRemote.lastSettingsRemoteHash) {
+                            // Nothing to do
+                            return@onRight
+                        }
+
+                        val encryptedSettings =
+                            settingsAdapter.fromJson(
+                                AesCbcWithIntegrity.decryptString(
+                                    response.encrypted,
+                                    secretKeys = secretKey,
+                                ),
+                            )
+
+                        if (encryptedSettings == null) {
+                            Log.e(LOG_TAG, "Failed to decrypt encrypted settings")
+                            return@onRight
+                        }
+
+                        applySettings(encryptedSettings.settings)
+
+                        syncRemote.lastSettingsRemoteHash = response.hash
+                        repository.updateSyncRemote(syncRemote)
+                    }.onLeft {
+                        it.ignoreIfSettingsUnsupportedElseHandle()
+                    }
+            }
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Error in getSettings", e)
+        }
+    }
+
     private suspend fun feedDiffing(remoteFeeds: List<EncryptedFeed>) {
         try {
             logDebug(LOG_TAG, "feedDiffing: ${remoteFeeds.size}")
+            val excludedUrls = repository.excludedSyncFeedUrls.value
             val remotelySeenFeedUrls = repository.getRemotelySeenFeeds()
 
             val feedUrlsWhichWereDeletedOnRemote =
                 remotelySeenFeedUrls
                     .filterNot { url -> remoteFeeds.asSequence().map { it.url }.contains(url) }
+                    // Never delete feeds the user excluded from sync on this device.
+                    .filterNot { url -> url.toString() in excludedUrls }
 
             logDebug(LOG_TAG, "RemotelyDeleted: ${feedUrlsWhichWereDeletedOnRemote.size}")
 
@@ -476,6 +531,10 @@ class SyncRestClient(
             }
 
             for (remoteFeed in remoteFeeds) {
+                // Excluded feeds are invisible to sync on this device - don't apply remote changes.
+                if (remoteFeed.url.toString() in excludedUrls) {
+                    continue
+                }
                 val seenRemotelyBefore = remoteFeed.url in remotelySeenFeedUrls
                 val dbFeed = repository.getFeed(remoteFeed.url)
 
@@ -528,6 +587,9 @@ class SyncRestClient(
     }
 
     suspend fun sendUpdatedFeeds(): Either<ErrorResponse, Boolean> {
+        if (!repository.syncFeedsEnabled.value) {
+            return Either.Right(false)
+        }
         return try {
             safeBlock { syncRemote, feederSync, secretKey ->
                 logDebug(LOG_TAG, "sendUpdatedFeeds")
@@ -535,10 +597,25 @@ class SyncRestClient(
 
                 // Only send if hash does not match
                 // Important to keep iteration order stable - across devices. So sort on URL, not ID or date
+                val excludedUrls = repository.excludedSyncFeedUrls.value
                 val feeds =
-                    repository
-                        .getFeedsOrderedByUrl()
-                        .map { it.toEncryptedFeed() }
+                    if (excludedUrls.isEmpty()) {
+                        repository
+                            .getFeedsOrderedByUrl()
+                            .map { it.toEncryptedFeed() }
+                    } else {
+                        // Send local feeds the user opted to sync, but preserve excluded feeds from
+                        // the remote blob so excluding one here doesn't delete it on other devices.
+                        val localFeeds =
+                            repository
+                                .getFeedsOrderedByUrl()
+                                .map { it.toEncryptedFeed() }
+                                .filterNot { it.url.toString() in excludedUrls }
+                        val preservedRemoteFeeds =
+                            fetchRemoteFeeds(syncRemote, feederSync, secretKey)
+                                .filter { it.url.toString() in excludedUrls }
+                        (localFeeds + preservedRemoteFeeds).sortedBy { it.url.toString() }
+                    }
 
                 // Yes, List hashCodes are based on elements. Just remember to hash what you send
                 // - and not raw database objects
@@ -603,11 +680,162 @@ class SyncRestClient(
         }
     }
 
+    suspend fun sendUpdatedSettings(): Either<ErrorResponse, Boolean> {
+        if (!repository.syncSettingsEnabled.value) {
+            return Either.Right(false)
+        }
+        return try {
+            safeBlock { syncRemote, feederSync, secretKey ->
+                logDebug(LOG_TAG, "sendUpdatedSettings")
+                val lastRemoteHash = syncRemote.lastSettingsRemoteHash
+
+                val excluded = repository.excludedSyncSettingKeys.value
+                val localEnabled = repository.getAllSettings().filterKeys { it !in excluded }
+
+                // Merge with the current remote so keys this device excludes (and thus does not
+                // manage) are preserved for other devices instead of being wiped from the blob.
+                val remoteSettings =
+                    fetchRemoteSettingsMap(syncRemote, feederSync, secretKey)
+                        ?: return@safeBlock Either.Right(false) // server doesn't support settings
+                val settings = remoteSettings + localEnabled
+
+                // List/Map hashCodes are based on elements. Just remember to hash what you send.
+                val currentContentHash = settings.hashCode()
+
+                if (lastRemoteHash == currentContentHash) {
+                    // Nothing to do
+                    logDebug(LOG_TAG, "Settings haven't changed - so not sending")
+                    return@safeBlock Either.Right(false)
+                }
+
+                val encrypted =
+                    AesCbcWithIntegrity.encryptString(
+                        settingsAdapter.toJson(
+                            EncryptedSettings(
+                                settings = settings,
+                            ),
+                        ),
+                        secretKeys = secretKey,
+                    )
+
+                // Might fail with 412 in case already updated remotely - need to call get
+                feederSync
+                    .updateSettings(
+                        syncChainId = syncRemote.syncChainId,
+                        currentDeviceId = syncRemote.deviceId,
+                        etagValue = syncRemote.lastSettingsRemoteHash.asWeakETagValue(),
+                        request =
+                            UpdateSettingsRequest(
+                                contentHash = currentContentHash,
+                                encrypted = encrypted,
+                            ),
+                    ).toEither()
+                    .onLeft {
+                        if (it.code == 412) {
+                            // Need to call get first because updates have happened
+                            getSettings()
+                            // Now try again
+                            sendUpdatedSettings()
+                        } else {
+                            it.ignoreIfSettingsUnsupportedElseHandle()
+                        }
+                    }.onRight { response ->
+                        syncRemote.lastSettingsRemoteHash = response.hash
+                        repository.updateSyncRemote(syncRemote)
+
+                        logDebug(LOG_TAG, "Received updated settings hash: ${response.hash}")
+                    }.map {
+                        true
+                    }
+            }
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Error in sendUpdatedSettings", e)
+            Either.Left(
+                ErrorResponse(1000, e.message, e),
+            )
+        }
+    }
+
+    private suspend fun applySettings(settings: Map<String, String>) {
+        val excluded = repository.excludedSyncSettingKeys.value
+        for ((key, value) in settings) {
+            if (key in excluded) {
+                continue
+            }
+            try {
+                opmlParserHandler.saveSetting(key, value)
+            } catch (e: Exception) {
+                Log.e(LOG_TAG, "Failed to apply synced setting: $key", e)
+            }
+        }
+    }
+
+    /**
+     * Fetches and decrypts the current remote settings blob, used to merge on send.
+     * Returns null only when the server does not support settings sync (404); an empty map
+     * means there is simply no remote blob yet.
+     */
+    private suspend fun fetchRemoteSettingsMap(
+        syncRemote: SyncRemote,
+        feederSync: FeederSync,
+        secretKey: SecretKeys,
+    ): Map<String, String>? =
+        feederSync
+            .getSettings(
+                syncChainId = syncRemote.syncChainId,
+                currentDeviceId = syncRemote.deviceId,
+            ).toEither()
+            .fold(
+                { error -> if (error.code == 404) null else emptyMap() },
+                { response ->
+                    runCatching {
+                        settingsAdapter.fromJson(
+                            AesCbcWithIntegrity.decryptString(response.encrypted, secretKeys = secretKey),
+                        )?.settings
+                    }.getOrNull() ?: emptyMap()
+                },
+            )
+
+    /** Fetches and decrypts the current remote feeds, used to preserve excluded feeds when merging on send. */
+    private suspend fun fetchRemoteFeeds(
+        syncRemote: SyncRemote,
+        feederSync: FeederSync,
+        secretKey: SecretKeys,
+    ): List<EncryptedFeed> =
+        feederSync
+            .getFeeds(
+                syncChainId = syncRemote.syncChainId,
+                currentDeviceId = syncRemote.deviceId,
+            ).toEither()
+            .fold(
+                { emptyList() },
+                { response ->
+                    runCatching {
+                        feedsAdapter.fromJson(
+                            AesCbcWithIntegrity.decryptString(response.encrypted, secretKeys = secretKey),
+                        )?.feeds
+                    }.getOrNull() ?: emptyList()
+                },
+            )
+
     private suspend fun ErrorResponse.leaveChainIfKickedOutElseLog() {
         Log.e(LOG_TAG, "leaveChainIfKickedOutElseLog: $code, $body", throwable)
         if (body?.contains(DEVICE_NOT_REGISTERED, ignoreCase = true) == true) {
             // this device has been removed from the chain from another device
             leave()
+        }
+    }
+
+    /**
+     * Settings sync is optional and only available on servers that implement the /settings endpoint.
+     * A 404 means the server (e.g. the stock public server) doesn't support it, so just skip silently
+     * instead of treating it as a fatal sync error.
+     */
+    private suspend fun ErrorResponse.ignoreIfSettingsUnsupportedElseHandle() {
+        if (code == 404) {
+            logDebug(LOG_TAG, "Settings sync not supported by this server (404), skipping")
+        } else {
+            leaveChainIfKickedOutElseLog()
         }
     }
 

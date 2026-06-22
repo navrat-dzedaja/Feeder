@@ -89,6 +89,30 @@ data class GetFeedsResponse(
     val encrypted: String,
 )
 
+data class UpdateSettingsRequest(
+    val contentHash: Int,
+    // Of type EncryptedSettings
+    val encrypted: String,
+)
+
+data class UpdateSettingsResponse(
+    val hash: Int,
+)
+
+data class GetSettingsResponse(
+    val hash: Int,
+    // Of type EncryptedSettings
+    val encrypted: String,
+)
+
+/**
+ * App settings synced as a single encrypted blob: a map of [com.nononsenseapps.feeder.archmodel.UserSettings]
+ * preference keys to their string values (the same representation used for OPML export/import).
+ */
+data class EncryptedSettings(
+    val settings: Map<String, String> = emptyMap(),
+)
+
 data class EncryptedFeeds(
     val feeds: List<EncryptedFeed>,
 )
@@ -103,6 +127,9 @@ data class EncryptedFeed(
     val openArticlesWith: String = OPEN_ARTICLE_WITH_APPLICATION_DEFAULT,
     val alternateId: Boolean = false,
     val fetchOgImages: Boolean = false,
+    val summarizeOnOpen: Boolean = false,
+    val summaryPrompt: String = "",
+    val skipDuplicates: Boolean = false,
     val whenModified: Instant = Instant.EPOCH,
 )
 
@@ -117,6 +144,9 @@ fun Feed.toEncryptedFeed(): EncryptedFeed =
         openArticlesWith = openArticlesWith,
         alternateId = alternateId,
         fetchOgImages = fetchOgImages,
+        summarizeOnOpen = summarizeOnOpen,
+        summaryPrompt = summaryPrompt,
+        skipDuplicates = skipDuplicates,
         whenModified = whenModified,
     )
 
@@ -131,5 +161,8 @@ fun EncryptedFeed.updateFeedCopy(feed: Feed): Feed =
         openArticlesWith = openArticlesWith,
         alternateId = alternateId,
         fetchOgImages = fetchOgImages,
+        summarizeOnOpen = summarizeOnOpen,
+        summaryPrompt = summaryPrompt,
+        skipDuplicates = skipDuplicates,
         whenModified = whenModified,
     )

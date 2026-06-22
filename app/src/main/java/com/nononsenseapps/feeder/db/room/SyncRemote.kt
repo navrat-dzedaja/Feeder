@@ -9,6 +9,7 @@ import com.nononsenseapps.feeder.db.COL_DEVICE_ID
 import com.nononsenseapps.feeder.db.COL_DEVICE_NAME
 import com.nononsenseapps.feeder.db.COL_ID
 import com.nononsenseapps.feeder.db.COL_LAST_FEEDS_REMOTE_HASH
+import com.nononsenseapps.feeder.db.COL_LAST_SETTINGS_REMOTE_HASH
 import com.nononsenseapps.feeder.db.COL_LATEST_MESSAGE_TIMESTAMP
 import com.nononsenseapps.feeder.db.COL_SECRET_KEY
 import com.nononsenseapps.feeder.db.COL_SYNC_CHAIN_ID
@@ -38,6 +39,7 @@ data class SyncRemote
         @ColumnInfo(name = COL_DEVICE_NAME) var deviceName: String = generateDeviceName(),
         @ColumnInfo(name = COL_SECRET_KEY) var secretKey: String = "",
         @ColumnInfo(name = COL_LAST_FEEDS_REMOTE_HASH) var lastFeedsRemoteHash: Int = 0,
+        @ColumnInfo(name = COL_LAST_SETTINGS_REMOTE_HASH) var lastSettingsRemoteHash: Int = 0,
     ) {
         constructor() : this(id = ID_UNSET)
 

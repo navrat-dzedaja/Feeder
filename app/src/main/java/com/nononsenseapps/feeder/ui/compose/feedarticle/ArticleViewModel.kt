@@ -522,7 +522,14 @@ class ArticleViewModel(
             try {
                 openAiSummary.value = OpenAISummaryState.Loading
                 val content = loadArticleContent()
-                val summaryResult = openAIApi.summarize(content, repository.openAISettings.value)
+                val feed = articleFlow.value?.item?.feedId?.let { repository.getFeed(it) }
+                val customInstruction = repository.resolveSummaryPrompt(feed)
+                val summaryResult =
+                    openAIApi.summarize(
+                        content = content,
+                        settings = repository.openAISettings.value,
+                        customInstruction = customInstruction,
+                    )
                 val annotatedStrings = convertSummaryToAnnotatedStrings(summaryResult)
                 openAiSummary.value =
                     OpenAISummaryState.Result(

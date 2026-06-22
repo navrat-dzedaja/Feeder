@@ -347,6 +347,62 @@ class Repository(
 
     fun setOpenAiSettings(value: OpenAISettings) = settingsStore.setOpenAiSettings(value)
 
+    fun getAllSettings(): Map<String, String> = settingsStore.getAllSettings()
+
+    // ---- Fine-grained sync selection ----
+    val syncSettingsEnabled = settingsStore.syncSettingsEnabled
+
+    fun setSyncSettingsEnabled(value: Boolean) = settingsStore.setSyncSettingsEnabled(value)
+
+    val syncFeedsEnabled = settingsStore.syncFeedsEnabled
+
+    fun setSyncFeedsEnabled(value: Boolean) = settingsStore.setSyncFeedsEnabled(value)
+
+    val excludedSyncSettingKeys = settingsStore.excludedSyncSettingKeys
+
+    fun setSettingKeysSynced(
+        keys: Collection<String>,
+        synced: Boolean,
+    ) = settingsStore.setSettingKeysSynced(keys, synced)
+
+    val excludedSyncFeedUrls = settingsStore.excludedSyncFeedUrls
+
+    fun setFeedUrlsSynced(
+        urls: Collection<String>,
+        synced: Boolean,
+    ) = settingsStore.setFeedUrlsSynced(urls, synced)
+
+    fun isSettingSyncable(key: String): Boolean = settingsStore.isSettingSyncable(key)
+
+    fun isFeedSyncable(url: String): Boolean = settingsStore.isFeedSyncable(url)
+
+    val appSummaryPrompt = settingsStore.appSummaryPrompt
+
+    fun setAppSummaryPrompt(value: String) = settingsStore.setAppSummaryPrompt(value)
+
+    val summaryPromptsByTag = settingsStore.summaryPromptsByTag
+
+    fun summaryPromptForTag(tag: String): String = settingsStore.summaryPromptForTag(tag)
+
+    fun setSummaryPromptForTag(
+        tag: String,
+        value: String,
+    ) = settingsStore.setSummaryPromptForTag(tag, value)
+
+    /**
+     * Resolves the effective custom summary prompt for a feed using the precedence
+     * feed-specific > tag-specific > app-wide. Returns an empty string when nothing is
+     * configured, in which case the built-in default prompt is used.
+     */
+    fun resolveSummaryPrompt(feed: Feed?): String =
+        sequenceOf(
+            feed?.summaryPrompt,
+            feed?.tag?.let { settingsStore.summaryPromptForTag(it) },
+            settingsStore.appSummaryPrompt.value,
+        ).firstOrNull { !it.isNullOrBlank() }
+            ?.trim()
+            .orEmpty()
+
     val translationApiSettings = settingsStore.translationApiSettings
 
     fun setTranslationApiSettings(value: TranslationApiSettings) = settingsStore.setTranslationApiSettings(value)

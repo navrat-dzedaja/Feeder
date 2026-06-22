@@ -23,6 +23,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
 import org.kodein.di.DI
 import org.kodein.di.DIAware
 import org.kodein.di.instance
@@ -492,6 +495,63 @@ class SettingsStore(
         sp.edit().putBoolean(PREF_BLOCKLIST_APPLY_TO_SUMMARIES, value).apply()
     }
 
+    // ---- Fine-grained sync selection (per-device, local only - never synced) ----
+    // Default: sync everything. The exclusion sets list items the user opted OUT of.
+
+    private val _syncSettingsEnabled = MutableStateFlow(sp.getBoolean(PREF_SYNC_SETTINGS_ENABLED, true))
+    val syncSettingsEnabled: StateFlow<Boolean> = _syncSettingsEnabled.asStateFlow()
+
+    fun setSyncSettingsEnabled(value: Boolean) {
+        _syncSettingsEnabled.value = value
+        sp.edit().putBoolean(PREF_SYNC_SETTINGS_ENABLED, value).apply()
+    }
+
+    private val _syncFeedsEnabled = MutableStateFlow(sp.getBoolean(PREF_SYNC_FEEDS_ENABLED, true))
+    val syncFeedsEnabled: StateFlow<Boolean> = _syncFeedsEnabled.asStateFlow()
+
+    fun setSyncFeedsEnabled(value: Boolean) {
+        _syncFeedsEnabled.value = value
+        sp.edit().putBoolean(PREF_SYNC_FEEDS_ENABLED, value).apply()
+    }
+
+    private val _excludedSyncSettingKeys =
+        MutableStateFlow(sp.getStringSet(PREF_SYNC_EXCLUDED_SETTING_KEYS, emptySet()).orEmpty().toSet())
+    val excludedSyncSettingKeys: StateFlow<Set<String>> = _excludedSyncSettingKeys.asStateFlow()
+
+    fun setSettingKeysSynced(
+        keys: Collection<String>,
+        synced: Boolean,
+    ) {
+        val updated =
+            _excludedSyncSettingKeys.value.toMutableSet().apply {
+                if (synced) removeAll(keys.toSet()) else addAll(keys)
+            }
+        _excludedSyncSettingKeys.value = updated.toSet()
+        sp.edit().putStringSet(PREF_SYNC_EXCLUDED_SETTING_KEYS, HashSet(updated)).apply()
+    }
+
+    private val _excludedSyncFeedUrls =
+        MutableStateFlow(sp.getStringSet(PREF_SYNC_EXCLUDED_FEED_URLS, emptySet()).orEmpty().toSet())
+    val excludedSyncFeedUrls: StateFlow<Set<String>> = _excludedSyncFeedUrls.asStateFlow()
+
+    fun setFeedUrlsSynced(
+        urls: Collection<String>,
+        synced: Boolean,
+    ) {
+        val updated =
+            _excludedSyncFeedUrls.value.toMutableSet().apply {
+                if (synced) removeAll(urls.toSet()) else addAll(urls)
+            }
+        _excludedSyncFeedUrls.value = updated.toSet()
+        sp.edit().putStringSet(PREF_SYNC_EXCLUDED_FEED_URLS, HashSet(updated)).apply()
+    }
+
+    /** A settings key is synced when settings sync is enabled and the key is not excluded. */
+    fun isSettingSyncable(key: String): Boolean = _syncSettingsEnabled.value && key !in _excludedSyncSettingKeys.value
+
+    /** A feed (by url) is synced when feed sync is enabled and the url is not excluded. */
+    fun isFeedSyncable(url: String): Boolean = _syncFeedsEnabled.value && url !in _excludedSyncFeedUrls.value
+
     private val _syncFrequency by lazy {
         MutableStateFlow(
             syncFrequencyFromString(sp.getStringNonNull(PREF_SYNC_FREQ, "60")),
@@ -528,6 +588,58 @@ class SettingsStore(
             .putString(PREF_OPENAI_AZURE_VERSION, value.azureApiVersion)
             .putString(PREF_OPENAI_AZURE_DEPLOYMENT_ID, value.azureDeploymentId)
             .putInt(PREF_OPENAI_REQUEST_TIMEOUT_SECONDS, value.timeoutSeconds)
+            .apply()
+    }
+
+    private val summaryPromptJson = Json { ignoreUnknownKeys = true }
+    private val summaryPromptMapSerializer = MapSerializer(String.serializer(), String.serializer())
+
+    private val _appSummaryPrompt =
+        MutableStateFlow(sp.getStringNonNull(PREF_SUMMARY_PROMPT, ""))
+    val appSummaryPrompt: StateFlow<String> = _appSummaryPrompt.asStateFlow()
+
+    fun setAppSummaryPrompt(value: String) {
+        _appSummaryPrompt.value = value
+        sp.edit().putString(PREF_SUMMARY_PROMPT, value).apply()
+    }
+
+    private val _summaryPromptsByTag = MutableStateFlow(readSummaryPromptsByTag())
+    val summaryPromptsByTag: StateFlow<Map<String, String>> = _summaryPromptsByTag.asStateFlow()
+
+    private fun readSummaryPromptsByTag(): Map<String, String> =
+        sp.getString(PREF_SUMMARY_PROMPT_BY_TAG, null)?.let { stored ->
+            runCatching { summaryPromptJson.decodeFromString(summaryPromptMapSerializer, stored) }.getOrNull()
+        } ?: emptyMap()
+
+    fun summaryPromptForTag(tag: String): String = _summaryPromptsByTag.value[tag].orEmpty()
+
+    /** Restores the whole per-tag prompt map from a serialized JSON string, e.g. during OPML import. */
+    fun importSummaryPromptsByTag(serialized: String) {
+        val parsed =
+            runCatching { summaryPromptJson.decodeFromString(summaryPromptMapSerializer, serialized) }.getOrNull()
+                ?: return
+        _summaryPromptsByTag.value = parsed
+        sp
+            .edit()
+            .putString(PREF_SUMMARY_PROMPT_BY_TAG, summaryPromptJson.encodeToString(summaryPromptMapSerializer, parsed))
+            .apply()
+    }
+
+    fun setSummaryPromptForTag(
+        tag: String,
+        value: String,
+    ) {
+        if (tag.isBlank()) {
+            return
+        }
+        val updated =
+            _summaryPromptsByTag.value.toMutableMap().apply {
+                if (value.isBlank()) remove(tag) else put(tag, value)
+            }
+        _summaryPromptsByTag.value = updated
+        sp
+            .edit()
+            .putString(PREF_SUMMARY_PROMPT_BY_TAG, summaryPromptJson.encodeToString(summaryPromptMapSerializer, updated))
             .apply()
     }
 
@@ -661,6 +773,15 @@ const val PREF_SWIPE_AS_READ = "pref_swipe_as_read"
 const val PREF_BLOCKLIST_APPLY_TO_SUMMARIES = "pref_blocklist_apply_to_summaries"
 
 /**
+ * Fine-grained sync selection (per-device, local only). Master toggles plus the sets of
+ * setting keys / feed urls the user opted out of syncing.
+ */
+const val PREF_SYNC_SETTINGS_ENABLED = "pref_sync_settings_enabled"
+const val PREF_SYNC_FEEDS_ENABLED = "pref_sync_feeds_enabled"
+const val PREF_SYNC_EXCLUDED_SETTING_KEYS = "pref_sync_excluded_setting_keys"
+const val PREF_SYNC_EXCLUDED_FEED_URLS = "pref_sync_excluded_feed_urls"
+
+/**
  * Sync settings
  */
 const val PREF_SYNC_ONLY_CHARGING = "pref_sync_only_charging"
@@ -720,6 +841,13 @@ const val PREF_OPENAI_URL = "pref_openai_url"
 const val PREF_OPENAI_AZURE_VERSION = "pref_openai_azure_version"
 const val PREF_OPENAI_AZURE_DEPLOYMENT_ID = "pref_openai_azure_deployment_id"
 const val PREF_OPENAI_REQUEST_TIMEOUT_SECONDS = "pref_openai_request_timeout_seconds"
+
+/**
+ * Custom summary prompts. Resolution order when summarizing: feed-specific (stored on the feed)
+ * overrides tag-specific, which overrides the app-wide prompt, which overrides the built-in default.
+ */
+const val PREF_SUMMARY_PROMPT = "pref_summary_prompt"
+const val PREF_SUMMARY_PROMPT_BY_TAG = "pref_summary_prompt_by_tag"
 
 // Keep the legacy persisted key name for preference and OPML compatibility.
 const val PREF_PREFERRED_TRANSLATION_LANGUAGE = "pref_openai_translation_language"
@@ -787,6 +915,8 @@ enum class UserSettings(
     SETTING_OPENAI_AZURE_VERSION(key = PREF_OPENAI_AZURE_VERSION),
     SETTING_OPENAI_AZURE_DEPLOYMENT_ID(key = PREF_OPENAI_AZURE_DEPLOYMENT_ID),
     SETTING_OPENAI_REQUEST_TIMEOUT_SECONDS(key = PREF_OPENAI_REQUEST_TIMEOUT_SECONDS),
+    SETTING_SUMMARY_PROMPT(key = PREF_SUMMARY_PROMPT),
+    SETTING_SUMMARY_PROMPT_BY_TAG(key = PREF_SUMMARY_PROMPT_BY_TAG),
     SETTING_BLOCKLIST_APPLY_TO_SUMMARIES(key = PREF_BLOCKLIST_APPLY_TO_SUMMARIES),
     SETTING_PREFERRED_TRANSLATION_LANGUAGE(key = PREF_PREFERRED_TRANSLATION_LANGUAGE),
     SETTING_TRANSLATION_API_KEY(key = PREF_TRANSLATION_API_KEY),

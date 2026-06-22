@@ -20,6 +20,7 @@ import com.nononsenseapps.feeder.db.COL_RETRY_AFTER
 import com.nononsenseapps.feeder.db.COL_SITE_FETCHED
 import com.nononsenseapps.feeder.db.COL_SKIP_DUPLICATES
 import com.nononsenseapps.feeder.db.COL_SUMMARIZE_ON_OPEN
+import com.nononsenseapps.feeder.db.COL_SUMMARY_PROMPT
 import com.nononsenseapps.feeder.db.COL_TAG
 import com.nononsenseapps.feeder.db.COL_TITLE
 import com.nononsenseapps.feeder.db.COL_URL
@@ -63,6 +64,8 @@ data class Feed
         @ColumnInfo(name = COL_RETRY_AFTER) var retryAfter: Instant = Instant.EPOCH,
         @ColumnInfo(name = COL_SUMMARIZE_ON_OPEN) var summarizeOnOpen: Boolean = false,
         @ColumnInfo(name = COL_FETCH_OG_IMAGES) var fetchOgImages: Boolean = false,
+        // Feed-specific custom summary prompt. Empty means inherit from tag/app-wide/default.
+        @ColumnInfo(name = COL_SUMMARY_PROMPT) var summaryPrompt: String = "",
     ) {
         constructor() : this(id = ID_UNSET)
 

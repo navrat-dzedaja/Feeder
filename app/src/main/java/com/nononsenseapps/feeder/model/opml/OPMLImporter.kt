@@ -156,6 +156,10 @@ open class OPMLImporter(
                 settingsStore.setTranslationApiSettings(newSettings)
             }
             UserSettings.SETTING_BLOCKLIST_APPLY_TO_SUMMARIES -> settingsStore.setApplyBlocklistToSummaries(value.toBoolean())
+
+            // Custom summary prompts
+            UserSettings.SETTING_SUMMARY_PROMPT -> settingsStore.setAppSummaryPrompt(value)
+            UserSettings.SETTING_SUMMARY_PROMPT_BY_TAG -> settingsStore.importSummaryPromptsByTag(value)
         }
     }
 

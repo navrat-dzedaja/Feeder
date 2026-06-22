@@ -11,6 +11,7 @@ import com.nononsenseapps.feeder.R
 import com.nononsenseapps.feeder.archmodel.Repository
 import com.nononsenseapps.feeder.background.runOnceRssSync
 import com.nononsenseapps.feeder.base.DIAwareViewModel
+import com.nononsenseapps.feeder.db.room.DEFAULT_SERVER_ADDRESS
 import com.nononsenseapps.feeder.db.room.SyncDevice
 import com.nononsenseapps.feeder.db.room.SyncRemote
 import com.nononsenseapps.feeder.util.DEEP_LINK_BASE_URI
@@ -46,6 +47,9 @@ class SyncScreenViewModel(
             state["secretKey"] ?: "",
         )
 
+    // The sync server address. Seeded from the persisted SyncRemote in init below.
+    private val serverUrl: MutableStateFlow<String> = MutableStateFlow("")
+
     private val screenToShow: MutableStateFlow<SyncScreenToShow> =
         MutableStateFlow(
             state["syncScreen"] ?: SyncScreenToShow.SETUP,
@@ -71,6 +75,12 @@ class SyncScreenViewModel(
 
         state["syncCode"] = code
         syncCode.update { code }
+
+        // If a full join link was pasted, pick up the self-hosted server address too.
+        val server = value.serverQueryParam
+        if (server.isNotBlank()) {
+            setServerUrl(server)
+        }
     }
 
     fun setSecretKey(value: String) {
@@ -83,6 +93,22 @@ class SyncScreenViewModel(
     fun setScreen(value: SyncScreenToShow) {
         state["syncScreen"] = value
         screenToShow.update { value }
+    }
+
+    /**
+     * Updates the sync server address. The raw text is always reflected in the UI; only valid
+     * URLs are persisted to the [SyncRemote] (used by create/join). Set this before creating or
+     * joining a chain so the right server is contacted.
+     */
+    fun setServerUrl(value: String) {
+        serverUrl.update { value }
+        val parsed = runCatching { URL(value.trim()) }.getOrNull() ?: return
+        applicationCoroutineScope.launch {
+            val current = repository.getSyncRemote()
+            if (current.url.toString() != parsed.toString()) {
+                repository.updateSyncRemote(current.copy(url = parsed))
+            }
+        }
     }
 
     fun updateDeviceList() {
@@ -180,6 +206,7 @@ class SyncScreenViewModel(
                 if (!state.contains("syncCode")) {
                     setSyncCode(syncRemote.syncChainId)
                 }
+                serverUrl.update { syncRemote.url.toString() }
             }
 
             combine(
@@ -188,11 +215,13 @@ class SyncScreenViewModel(
                 screenToShow,
                 repository.getDevices(),
                 secretKey,
+                serverUrl,
             ) { params ->
                 val syncCode = params[0] as String
                 val syncRemote = params[1] as SyncRemote?
                 val screen = params[2] as SyncScreenToShow
                 val secretKey = params[4] as String
+                val serverUrl = params[5] as String
 
                 @Suppress("UNCHECKED_CAST")
                 val deviceList = params[3] as List<SyncDevice>
@@ -227,14 +256,29 @@ class SyncScreenViewModel(
                 )
 
                 val remoteKeyEncoded = (syncRemote?.secretKey ?: "").urlEncode()
+                val serverAddress = syncRemote?.url?.toString() ?: DEFAULT_SERVER_ADDRESS
+                // For the official server use the app's deep-link host so the link opens the app
+                // when tapped; for a self-hosted server use its own address so the QR reflects it.
+                // Always carry the server as a query param so the joining device auto-configures it.
+                val joinLinkBase =
+                    if (serverAddress.contains("nononsenseapps.com", ignoreCase = true)) {
+                        DEEP_LINK_BASE_URI
+                    } else {
+                        serverAddress.trimEnd('/')
+                    }
 
                 SyncScreenViewState(
                     syncCode = syncCode,
-                    addNewDeviceUrl = URL("$DEEP_LINK_BASE_URI/sync/join?sync_code=${syncRemote?.syncChainId ?: ""}&key=$remoteKeyEncoded"),
+                    addNewDeviceUrl =
+                        URL(
+                            "$joinLinkBase/sync/join?sync_code=${syncRemote?.syncChainId ?: ""}" +
+                                "&key=$remoteKeyEncoded&server=${serverAddress.urlEncode()}",
+                        ),
                     singleScreenToShow = actualScreen,
                     deviceId = syncRemote?.deviceId ?: 0,
                     deviceList = deviceList,
                     secretKey = secretKey,
+                    serverUrl = serverUrl,
                 )
             }.collect {
                 _viewState.value = it
@@ -255,6 +299,7 @@ data class SyncScreenViewState(
     val singleScreenToShow: SyncScreenToShow = SyncScreenToShow.SETUP,
     val deviceId: Long = 0,
     val deviceList: List<SyncDevice> = emptyList(),
+    val serverUrl: String = "",
 ) {
     val leftScreenToShow: LeftScreenToShow
         get() =

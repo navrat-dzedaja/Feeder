@@ -107,6 +107,17 @@ class OpenAIApi(
 
     companion object {
         private val LANG_REGEX = Regex("^Lang: \"?([a-zA-Z_-]+)\"?$")
+
+        // Default summarization instruction (tone/length/format). Overridable per app/tag/feed.
+        val DEFAULT_SUMMARY_INSTRUCTION =
+            listOf(
+                "You are an assistant in an RSS reader app, summarizing article content.",
+                "Keep summaries up to 100 words, 3 paragraphs, with up to 3 bullet points per paragraph.",
+                "For readability use markdown formatting: **bold** for emphasis, *italics* for quotes, " +
+                    "bullet points (-) for lists, # headers for sections, and > for block quotes.",
+                "Use markdown to structure content and improve readability.",
+                "Keep full quotes if any.",
+            ).joinToString(separator = " ")
     }
 
     private fun okHttpClient(timeoutSeconds: Int): OkHttpClient =
@@ -174,6 +185,7 @@ class OpenAIApi(
     suspend fun summarize(
         content: String,
         settings: OpenAISettings,
+        customInstruction: String = "",
     ): SummaryResult {
         if (settings.isDeepL) {
             return SummaryResult.Error(content = "Summarization is not supported for this translation-only provider")
@@ -184,7 +196,7 @@ class OpenAIApi(
         try {
             val response =
                 openAIClientFactory(settings).chatCompletion(
-                    request = summaryRequest(content, settings),
+                    request = summaryRequest(content, settings, customInstruction),
                     requestOptions = null,
                 )
             val summaryResponse: SummaryResponse =
@@ -273,27 +285,21 @@ class OpenAIApi(
     private fun summaryRequest(
         content: String,
         settings: OpenAISettings,
-    ): ChatCompletionRequest =
-        ChatCompletionRequest(
+        customInstruction: String,
+    ): ChatCompletionRequest {
+        // The instruction (tone/length/focus) is overridable by the user. The language/format
+        // contract is always appended so the "Lang:" first-line parsing keeps working.
+        val instruction = customInstruction.trim().ifBlank { DEFAULT_SUMMARY_INSTRUCTION }
+        val systemMessage =
+            (listOf(instruction) + summaryFormatContract())
+                .joinToString(separator = " ")
+        return ChatCompletionRequest(
             model = ModelId(id = settings.modelId),
             messages =
                 listOf(
                     ChatMessage(
                         role = ChatRole.System,
-                        messageContent =
-                            TextContent(
-                                listOf(
-                                    "You are an assistant in an RSS reader app, summarizing article content.",
-                                    "The app language is '$appLang'.",
-                                    "Provide summaries in the article's language if 99% recognizable; otherwise, use the app language.",
-                                    "First line must be exactly: 'Lang: \"ISO code\"' with NO markdown formatting around the Lang line whatsoever.",
-                                    "Keep summaries up to 100 words, 3 paragraphs, with up to 3 bullet points per paragraph.",
-                                    "For readability use markdown formatting: **bold** for emphasis, *italics* for quotes, bullet points (-) for lists, # headers for sections, and > for block quotes.",
-                                    "Use markdown to structure content and improve readability.",
-                                    "Use only single language.",
-                                    "Keep full quotes if any.",
-                                ).joinToString(separator = " "),
-                            ),
+                        messageContent = TextContent(systemMessage),
                     ),
                     ChatMessage(
                         role = ChatRole.User,
@@ -301,6 +307,15 @@ class OpenAIApi(
                     ),
                 ),
             responseFormat = ChatResponseFormat.Text,
+        )
+    }
+
+    private fun summaryFormatContract(): List<String> =
+        listOf(
+            "The app language is '$appLang'.",
+            "Provide summaries in the article's language if 99% recognizable; otherwise, use the app language.",
+            "First line must be exactly: 'Lang: \"ISO code\"' with NO markdown formatting around the Lang line whatsoever.",
+            "Use only single language.",
         )
 
     private inline fun <reified RequestBodyT, reified ResponseBodyT> postJson(

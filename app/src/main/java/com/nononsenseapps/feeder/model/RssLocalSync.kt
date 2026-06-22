@@ -120,9 +120,11 @@ class RssLocalSync(
                         // Fetch sync stuff first - this is fast
                         try {
                             syncClient.getFeeds()
+                            syncClient.getSettings()
                             syncClient.getRead()
                             syncClient.getDevices()
                             syncClient.sendUpdatedFeeds()
+                            syncClient.sendUpdatedSettings()
                             syncClient.markAsRead()
                         } catch (e: Exception) {
                             Log.e(LOG_TAG, "error with syncClient: ${e.message}", e)

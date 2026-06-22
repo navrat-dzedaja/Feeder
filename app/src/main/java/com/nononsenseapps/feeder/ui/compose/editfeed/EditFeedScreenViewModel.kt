@@ -47,6 +47,7 @@ class EditFeedScreenViewModel(
     override var articleOpener: String by mutableSavedStateOf(state, "")
     override var alternateId: Boolean by mutableSavedStateOf(state, false)
     override var summarizeOnOpen: Boolean by mutableSavedStateOf(state, false)
+    override var summaryPrompt: String by mutableSavedStateOf(state, "")
     override var fetchOgImages: Boolean by mutableSavedStateOf(state, false)
     override var allTags: List<String> by mutableStateOf(emptyList())
 
@@ -113,6 +114,9 @@ class EditFeedScreenViewModel(
             if (!state.contains("summarizeOnOpen")) {
                 summarizeOnOpen = feed.summarizeOnOpen
             }
+            if (!state.contains("summaryPrompt")) {
+                summaryPrompt = feed.summaryPrompt
+            }
             if (!state.contains("fetchOgImages")) {
                 fetchOgImages = feed.fetchOgImages
             }
@@ -142,6 +146,7 @@ class EditFeedScreenViewModel(
                     openArticlesWith = articleOpener,
                     alternateId = alternateId,
                     summarizeOnOpen = summarizeOnOpen,
+                    summaryPrompt = summaryPrompt,
                     fetchOgImages = fetchOgImages,
                 )
 

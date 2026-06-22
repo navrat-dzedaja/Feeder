@@ -43,6 +43,7 @@ const val COL_DEVICE_NAME = "device_name"
 const val COL_SECRET_KEY = "secret_key"
 const val COL_WHEN_MODIFIED = "when_modified"
 const val COL_LAST_FEEDS_REMOTE_HASH = "last_feeds_remote_hash"
+const val COL_LAST_SETTINGS_REMOTE_HASH = "last_settings_remote_hash"
 const val COL_BOOKMARKED = "bookmarked"
 const val COL_GLOB_PATTERN = "glob_pattern"
 const val COL_FULLTEXT_DOWNLOADED = "fulltext_downloaded"
@@ -55,6 +56,7 @@ const val COL_BLOCK_TIME = "block_time"
 const val COL_RETRY_AFTER = "retry_after"
 const val COL_SUMMARIZE_ON_OPEN = "summarize_on_open"
 const val COL_FETCH_OG_IMAGES = "fetch_og_images"
+const val COL_SUMMARY_PROMPT = "summary_prompt"
 
 // year 5000
 val FAR_FUTURE = Instant.ofEpochSecond(95635369646)

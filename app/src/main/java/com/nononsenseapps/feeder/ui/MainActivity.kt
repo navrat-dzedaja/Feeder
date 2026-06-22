@@ -25,6 +25,8 @@ import com.nononsenseapps.feeder.ui.compose.navigation.EditFeedDestination
 import com.nononsenseapps.feeder.ui.compose.navigation.FeedDestination
 import com.nononsenseapps.feeder.ui.compose.navigation.SearchFeedDestination
 import com.nononsenseapps.feeder.ui.compose.navigation.SettingsDestination
+import com.nononsenseapps.feeder.ui.compose.navigation.SummaryPromptsDestination
+import com.nononsenseapps.feeder.ui.compose.navigation.SyncSelectionDestination
 import com.nononsenseapps.feeder.ui.compose.navigation.SyncScreenDestination
 import com.nononsenseapps.feeder.ui.compose.navigation.TextSettingsDestination
 import com.nononsenseapps.feeder.ui.compose.utils.withAllProviders
@@ -120,6 +122,10 @@ class MainActivity : DIAwareComponentActivity() {
             SyncScreenDestination.register(this, navController, navDrawerListState, mainActivityViewModel)
             // Add Fonts
             TextSettingsDestination.register(this, navController, navDrawerListState, mainActivityViewModel)
+            // Custom summary prompts
+            SummaryPromptsDestination.register(this, navController, navDrawerListState, mainActivityViewModel)
+            // Fine-grained sync selection
+            SyncSelectionDestination.register(this, navController, navDrawerListState, mainActivityViewModel)
         }
 
         DisposableEffect(navController) {

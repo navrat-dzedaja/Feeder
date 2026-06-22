@@ -46,8 +46,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.KeyboardType
+import com.nononsenseapps.feeder.db.room.DEFAULT_SERVER_ADDRESS
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
@@ -232,6 +235,10 @@ fun SyncScreen(
                     if (secretKey.isNotBlank()) {
                         viewModel.setSecretKey(secretKey)
                     }
+                    val server = it.serverQueryParam
+                    if (server.isNotBlank()) {
+                        viewModel.setServerUrl(server)
+                    }
                 }
             }
         }
@@ -293,6 +300,8 @@ fun SyncScreen(
         },
         currentDeviceId = viewState.deviceId,
         devices = ImmutableHolder(viewState.deviceList),
+        serverUrl = viewState.serverUrl,
+        onServerUrlChange = viewModel::setServerUrl,
     )
 
     if (showLeaveSyncChainDialog) {
@@ -326,6 +335,8 @@ fun SyncScreen(
     currentDeviceId: Long,
     devices: ImmutableHolder<List<SyncDevice>>,
     onLeaveSyncChain: () -> Unit,
+    serverUrl: String = "",
+    onServerUrlChange: (String) -> Unit = {},
 ) {
     if (targetScreen == SyncScreenType.DUAL) {
         DualSyncScreen(
@@ -345,6 +356,8 @@ fun SyncScreen(
             secretKey = viewState.secretKey,
             onSetSecretKey = onSetSecretKey,
             onLeaveSyncChain = onLeaveSyncChain,
+            serverUrl = serverUrl,
+            onServerUrlChange = onServerUrlChange,
         )
     }
 
@@ -372,6 +385,8 @@ fun SyncScreen(
             onScanSyncCode = onScanSyncCode,
             onStartNewSyncChain = onStartNewSyncChain,
             onLeaveSyncChain = onLeaveSyncChain,
+            serverUrl = serverUrl,
+            onServerUrlChange = onServerUrlChange,
         )
     }
 
@@ -467,6 +482,8 @@ fun DualSyncScreen(
     secretKey: String,
     onSetSecretKey: (String) -> Unit,
     onLeaveSyncChain: () -> Unit,
+    serverUrl: String = "",
+    onServerUrlChange: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onNavigateUp)
@@ -494,6 +511,8 @@ fun DualSyncScreen(
                     SyncSetupContent(
                         onScanSyncCode = onScanSyncCode,
                         onStartNewSyncChain = onStartNewSyncChain,
+                        serverUrl = serverUrl,
+                        onServerUrlChange = onServerUrlChange,
                         modifier =
                             Modifier
                                 .weight(1f, fill = true),
@@ -547,6 +566,8 @@ fun SyncSetupScreen(
     onScanSyncCode: () -> Unit,
     onStartNewSyncChain: () -> Unit,
     onLeaveSyncChain: () -> Unit,
+    serverUrl: String = "",
+    onServerUrlChange: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onNavigateUp)
@@ -562,6 +583,8 @@ fun SyncSetupScreen(
         SyncSetupContent(
             onScanSyncCode = onScanSyncCode,
             onStartNewSyncChain = onStartNewSyncChain,
+            serverUrl = serverUrl,
+            onServerUrlChange = onServerUrlChange,
             modifier = innerModifier.verticalScroll(scrollState),
         )
     }
@@ -571,6 +594,8 @@ fun SyncSetupScreen(
 fun SyncSetupContent(
     onScanSyncCode: () -> Unit,
     onStartNewSyncChain: () -> Unit,
+    serverUrl: String = "",
+    onServerUrlChange: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val dimens = LocalDimens.current
@@ -621,6 +646,17 @@ fun SyncSetupContent(
             modifier = Modifier.fillMaxWidth(),
         )
 
+        TextField(
+            value = serverUrl,
+            onValueChange = onServerUrlChange,
+            label = { Text(stringResource(R.string.sync_server_url)) },
+            placeholder = { Text(DEFAULT_SERVER_ADDRESS) },
+            supportingText = { Text(stringResource(R.string.sync_server_url_description)) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            modifier = Modifier.fillMaxWidth(),
+        )
+
         Spacer(modifier = Modifier.size(24.dp))
 
         Button(
@@ -660,6 +696,23 @@ internal val String.secretKeyQueryParam
                     }
                 } else {
                     it
+                }
+            }
+
+internal val String.serverQueryParam
+    get() =
+        substringAfter("server=", "")
+            .substringBefore("&")
+            .let {
+                if (it.isBlank()) {
+                    ""
+                } else {
+                    try {
+                        URLDecoder.decode(it, "UTF-8")
+                    } catch (e: Exception) {
+                        Log.e(LOG_TAG, "Failed to decode server url", e)
+                        it
+                    }
                 }
             }
 

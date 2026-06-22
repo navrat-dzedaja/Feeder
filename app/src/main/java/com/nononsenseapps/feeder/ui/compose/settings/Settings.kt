@@ -110,6 +110,8 @@ fun SettingsScreen(
     onNavigateUp: () -> Unit,
     onNavigateToSyncScreen: () -> Unit,
     onNavigateToTextSettingsScreen: () -> Unit,
+    onNavigateToSummaryPromptsScreen: () -> Unit,
+    onNavigateToSyncSelectionScreen: () -> Unit,
     settingsViewModel: SettingsViewModel,
     modifier: Modifier = Modifier,
 ) {
@@ -219,6 +221,8 @@ fun SettingsScreen(
             translateArticlesByDefault = viewState.translateArticlesByDefault,
             onTranslateArticlesByDefault = settingsViewModel::setTranslateArticlesByDefault,
             onTextSettings = onNavigateToTextSettingsScreen,
+            onSummaryPrompts = onNavigateToSummaryPromptsScreen,
+            onSyncSelection = onNavigateToSyncSelectionScreen,
             currentFontSelection = viewState.font,
             isPagingMode = viewState.isPagingMode,
             onIsPagingModeChange = settingsViewModel::setIsPagingMode,
@@ -311,6 +315,8 @@ private fun SettingsScreenPreview() {
             translateArticlesByDefault = false,
             onTranslateArticlesByDefault = {},
             onTextSettings = {},
+            onSummaryPrompts = {},
+            onSyncSelection = {},
             currentFontSelection = FontSelection.SystemDefault,
             isPagingMode = false,
             onIsPagingModeChange = {},
@@ -399,6 +405,8 @@ fun SettingsList(
     isAnimatedPaging: Boolean,
     onIsAnimatedPagingChange: (Boolean) -> Unit,
     onTextSettings: () -> Unit,
+    onSummaryPrompts: () -> Unit,
+    onSyncSelection: () -> Unit,
     onSendFeedback: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -592,6 +600,14 @@ fun SettingsList(
                 title = stringResource(id = R.string.device_sync),
                 {
                     onOpenSyncSettings()
+                },
+            )
+
+            ExternalSetting(
+                currentValue = stringResource(id = R.string.sync_selection_settings_subtitle),
+                title = stringResource(id = R.string.sync_selection_settings_title),
+                {
+                    onSyncSelection()
                 },
             )
         }
@@ -793,6 +809,12 @@ fun SettingsList(
                 state = summaryAIState,
                 onEvent = onSummaryAIEvent,
                 section = OpenAISectionType.Summary,
+            )
+
+            ExternalSetting(
+                currentValue = stringResource(R.string.summary_prompts_settings_subtitle),
+                title = stringResource(R.string.summary_prompts_settings_title),
+                onClick = onSummaryPrompts,
             )
 
             TranslationApiSection(

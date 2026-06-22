@@ -75,4 +75,18 @@ interface FeederSync {
         @Header("If-Match") etagValue: String,
         @Body request: UpdateFeedsRequest,
     ): Response<UpdateFeedsResponse>
+
+    @GET("settings")
+    suspend fun getSettings(
+        @Header("X-FEEDER-ID") syncChainId: String,
+        @Header("X-FEEDER-DEVICE-ID") currentDeviceId: Long,
+    ): Response<GetSettingsResponse>
+
+    @POST("settings")
+    suspend fun updateSettings(
+        @Header("X-FEEDER-ID") syncChainId: String,
+        @Header("X-FEEDER-DEVICE-ID") currentDeviceId: Long,
+        @Header("If-Match") etagValue: String,
+        @Body request: UpdateSettingsRequest,
+    ): Response<UpdateSettingsResponse>
 }

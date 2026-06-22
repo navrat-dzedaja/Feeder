@@ -32,6 +32,10 @@ import com.nononsenseapps.feeder.ui.compose.feed.FeedScreen
 import com.nononsenseapps.feeder.ui.compose.feedarticle.ArticleScreen
 import com.nononsenseapps.feeder.ui.compose.searchfeed.SearchFeedScreen
 import com.nononsenseapps.feeder.ui.compose.settings.SettingsScreen
+import com.nononsenseapps.feeder.ui.compose.settings.SummaryPromptsScreen
+import com.nononsenseapps.feeder.ui.compose.settings.SummaryPromptsViewModel
+import com.nononsenseapps.feeder.ui.compose.sync.SyncSelectionScreen
+import com.nononsenseapps.feeder.ui.compose.sync.SyncSelectionViewModel
 import com.nononsenseapps.feeder.ui.compose.settings.TextSettingsScreen
 import com.nononsenseapps.feeder.ui.compose.settings.TextSettingsViewModel
 import com.nononsenseapps.feeder.ui.compose.sync.SyncScreen
@@ -218,6 +222,74 @@ data object TextSettingsDestination : NavigationDestination(
     }
 }
 
+data object SummaryPromptsDestination : NavigationDestination(
+    path = "summary/prompts",
+    navArguments = emptyList(),
+    deepLinks =
+        listOf(
+            navDeepLink {
+                uriPattern = "$DEEP_LINK_BASE_URI/settings/summary-prompts"
+            },
+        ),
+) {
+    fun navigate(navController: NavController) {
+        navController.navigate(path) {
+            launchSingleTop = true
+        }
+    }
+
+    @Composable
+    override fun RegisterScreen(
+        navController: NavController,
+        backStackEntry: NavBackStackEntry,
+        navDrawerListState: LazyListState,
+        mainActivityViewModel: MainActivityViewModel,
+    ) {
+        val summaryPromptsViewModel: SummaryPromptsViewModel = backStackEntry.diAwareViewModel()
+
+        SummaryPromptsScreen(
+            onNavigateUp = {
+                navController.popBackStack()
+            },
+            viewModel = summaryPromptsViewModel,
+        )
+    }
+}
+
+data object SyncSelectionDestination : NavigationDestination(
+    path = "sync/selection",
+    navArguments = emptyList(),
+    deepLinks =
+        listOf(
+            navDeepLink {
+                uriPattern = "$DEEP_LINK_BASE_URI/settings/sync-selection"
+            },
+        ),
+) {
+    fun navigate(navController: NavController) {
+        navController.navigate(path) {
+            launchSingleTop = true
+        }
+    }
+
+    @Composable
+    override fun RegisterScreen(
+        navController: NavController,
+        backStackEntry: NavBackStackEntry,
+        navDrawerListState: LazyListState,
+        mainActivityViewModel: MainActivityViewModel,
+    ) {
+        val syncSelectionViewModel: SyncSelectionViewModel = backStackEntry.diAwareViewModel()
+
+        SyncSelectionScreen(
+            onNavigateUp = {
+                navController.popBackStack()
+            },
+            viewModel = syncSelectionViewModel,
+        )
+    }
+}
+
 data object AddFeedDestination : NavigationDestination(
     path = "add/feed",
     navArguments =
@@ -344,6 +416,12 @@ data object SettingsDestination : NavigationDestination(
             },
             onNavigateToTextSettingsScreen = {
                 TextSettingsDestination.navigate(navController)
+            },
+            onNavigateToSummaryPromptsScreen = {
+                SummaryPromptsDestination.navigate(navController)
+            },
+            onNavigateToSyncSelectionScreen = {
+                SyncSelectionDestination.navigate(navController)
             },
             settingsViewModel = backStackEntry.diAwareViewModel(),
         )

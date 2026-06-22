@@ -501,6 +501,27 @@ fun ColumnScope.RightContent(
         { viewState.summarizeOnOpen = it },
         icon = null,
     )
+    OutlinedTextField(
+        value = viewState.summaryPrompt,
+        onValueChange = { viewState.summaryPrompt = it },
+        label = {
+            Text(stringResource(id = R.string.summary_prompt_feed_label))
+        },
+        supportingText = {
+            Text(stringResource(id = R.string.summary_prompt_feed_supporting))
+        },
+        minLines = 2,
+        keyboardOptions =
+            KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
+                autoCorrectEnabled = true,
+                keyboardType = KeyboardType.Text,
+            ),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 64.dp),
+    )
     SwitchSetting(
         title = stringResource(id = R.string.fetch_og_images),
         checked = viewState.fetchOgImages,
@@ -584,6 +605,7 @@ interface EditFeedScreenState {
     var articleOpener: String
     var alternateId: Boolean
     var summarizeOnOpen: Boolean
+    var summaryPrompt: String
     var fetchOgImages: Boolean
     val isOkToSave: Boolean
     val isNotValidUrl: Boolean
@@ -618,6 +640,7 @@ private class ScreenState(
     override var articleOpener: String by mutableStateOf("")
     override var alternateId: Boolean by mutableStateOf(false)
     override var summarizeOnOpen: Boolean by mutableStateOf(false)
+    override var summaryPrompt: String by mutableStateOf("")
     override var fetchOgImages: Boolean by mutableStateOf(false)
 }
 
