@@ -326,6 +326,15 @@
   <string name="provider_azure_openai">Azure OpenAI</string>
   <string name="provider_deepl">DeepL</string>
   <string name="provider_local_translation">Local</string>
+  <string name="provider_on_device_prompt">On-device · ML Kit Prompt</string>
+  <string name="provider_on_device_summary">On-device · ML Kit Summary</string>
+  <string name="on_device_ai_info_prompt">Runs on your device with Gemini Nano (AICore) — no data leaves the phone. Uses your custom prompts. Needs a supported device; the model downloads on first use.</string>
+  <string name="on_device_ai_info_summary">Runs on your device with Gemini Nano (AICore) — no data leaves the phone. Produces fixed bullet summaries, so custom prompts are ignored. English, Japanese and Korean only.</string>
+  <string name="on_device_ai_status_unsupported_build">On-device AI is not bundled in this build. Install the Google Play build to use it.</string>
+  <string name="on_device_ai_status_unavailable">Not supported on this device.</string>
+  <string name="on_device_ai_status_downloadable">Supported. The model will download on first use.</string>
+  <string name="on_device_ai_status_downloading">The on-device model is downloading…</string>
+  <string name="on_device_ai_status_available">Ready to use on this device.</string>
   <string name="base_url_optional">Base URL (optional)</string>
   <string name="translation_endpoint">Translation endpoint</string>
   <string name="azure_api_version">Azure API version</string>

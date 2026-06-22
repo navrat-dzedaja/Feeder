@@ -193,6 +193,9 @@ class OpenAIApi(
         if (settings.isLocalTranslation) {
             return SummaryResult.Error(content = "Summarization is not supported for this translation-only provider")
         }
+        if (settings.isOnDevice) {
+            return SummaryResult.Error(content = "On-device summarization is handled by the on-device summarizer")
+        }
         try {
             val response =
                 openAIClientFactory(settings).chatCompletion(
@@ -384,9 +387,20 @@ val OpenAISettings.isDeepL: Boolean
 val OpenAISettings.isLocalTranslation: Boolean
     get() = baseUrl == LOCAL_TRANSLATION_PROVIDER_URL
 
+/** On-device ML Kit GenAI Prompt API (Gemini Nano) — honours custom prompts. */
+val OpenAISettings.isOnDevicePrompt: Boolean
+    get() = baseUrl == ON_DEVICE_PROMPT_PROVIDER_URL
+
+/** On-device ML Kit GenAI Summarization API (Gemini Nano) — fixed bullets, ignores custom prompts. */
+val OpenAISettings.isOnDeviceSummary: Boolean
+    get() = baseUrl == ON_DEVICE_SUMMARY_PROVIDER_URL
+
+val OpenAISettings.isOnDevice: Boolean
+    get() = isOnDevicePrompt || isOnDeviceSummary
+
 val OpenAISettings.isValid: Boolean
     get() =
-        if (isLocalTranslation) {
+        if (isLocalTranslation || isOnDevice) {
             true
         } else if (isDeepL) {
             key.isNotEmpty()
@@ -509,3 +523,5 @@ private fun OpenAISettings.normalizedDeepLBaseUrl(): String {
 }
 
 const val LOCAL_TRANSLATION_PROVIDER_URL = "local://translation"
+const val ON_DEVICE_PROMPT_PROVIDER_URL = "local://aicore-prompt"
+const val ON_DEVICE_SUMMARY_PROVIDER_URL = "local://aicore-summary"

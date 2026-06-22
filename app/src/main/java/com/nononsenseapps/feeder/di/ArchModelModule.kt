@@ -1,6 +1,8 @@
 package com.nononsenseapps.feeder.di
 
 import android.app.Application
+import com.nononsenseapps.feeder.aicore.OnDeviceSummarizer
+import com.nononsenseapps.feeder.aicore.OnDeviceSummarizerImpl
 import com.nononsenseapps.feeder.archmodel.FeedItemStore
 import com.nononsenseapps.feeder.archmodel.FeedStore
 import com.nononsenseapps.feeder.archmodel.FontStore
@@ -30,8 +32,8 @@ import com.nononsenseapps.feeder.ui.compose.feedarticle.FeedViewModel
 import com.nononsenseapps.feeder.ui.compose.searchfeed.SearchFeedViewModel
 import com.nononsenseapps.feeder.ui.compose.settings.SettingsViewModel
 import com.nononsenseapps.feeder.ui.compose.settings.SummaryPromptsViewModel
-import com.nononsenseapps.feeder.ui.compose.sync.SyncSelectionViewModel
 import com.nononsenseapps.feeder.ui.compose.settings.TextSettingsViewModel
+import com.nononsenseapps.feeder.ui.compose.sync.SyncSelectionViewModel
 import com.nononsenseapps.feeder.widget.FeedWidgetSettingsActivityViewModel
 import kotlinx.serialization.json.Json
 import org.kodein.di.DI
@@ -53,6 +55,7 @@ val archModelModule =
         bind<SyncRemoteStore>() with singleton { SyncRemoteStore(di) }
         bind<OPMLParserHandler>() with singleton { OPMLImporter(di) }
         bind<LocalTranslator>() with singleton { LocalTranslator(di) }
+        bind<OnDeviceSummarizer>() with singleton { OnDeviceSummarizerImpl(di) }
         bind<TranslationManager>() with singleton { TranslationManager(di) }
         bindFactory<OpenAISettings, OpenAIClient> { settings -> OpenAIClientDefault(settings) }
         bind<OpenAIApi>() with singleton { OpenAIApi(appLang = Locale.getDefault().getISO3Language(), factory()) }

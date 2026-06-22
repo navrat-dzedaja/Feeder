@@ -34,12 +34,12 @@ import com.nononsenseapps.feeder.ui.compose.searchfeed.SearchFeedScreen
 import com.nononsenseapps.feeder.ui.compose.settings.SettingsScreen
 import com.nononsenseapps.feeder.ui.compose.settings.SummaryPromptsScreen
 import com.nononsenseapps.feeder.ui.compose.settings.SummaryPromptsViewModel
-import com.nononsenseapps.feeder.ui.compose.sync.SyncSelectionScreen
-import com.nononsenseapps.feeder.ui.compose.sync.SyncSelectionViewModel
 import com.nononsenseapps.feeder.ui.compose.settings.TextSettingsScreen
 import com.nononsenseapps.feeder.ui.compose.settings.TextSettingsViewModel
 import com.nononsenseapps.feeder.ui.compose.sync.SyncScreen
 import com.nononsenseapps.feeder.ui.compose.sync.SyncScreenViewModel
+import com.nononsenseapps.feeder.ui.compose.sync.SyncSelectionScreen
+import com.nononsenseapps.feeder.ui.compose.sync.SyncSelectionViewModel
 import com.nononsenseapps.feeder.util.DEEP_LINK_BASE_URI
 import com.nononsenseapps.feeder.util.logDebug
 

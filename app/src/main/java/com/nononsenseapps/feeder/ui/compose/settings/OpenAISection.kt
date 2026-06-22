@@ -60,10 +60,14 @@ import com.aallam.openai.client.OpenAIHost
 import com.nononsenseapps.feeder.R
 import com.nononsenseapps.feeder.archmodel.OpenAISettings
 import com.nononsenseapps.feeder.openai.LOCAL_TRANSLATION_PROVIDER_URL
+import com.nononsenseapps.feeder.openai.ON_DEVICE_PROMPT_PROVIDER_URL
+import com.nononsenseapps.feeder.openai.ON_DEVICE_SUMMARY_PROVIDER_URL
 import com.nononsenseapps.feeder.openai.canUseAsTranslationApi
 import com.nononsenseapps.feeder.openai.isBlankConfiguration
 import com.nononsenseapps.feeder.openai.isDeepL
 import com.nononsenseapps.feeder.openai.isLocalTranslation
+import com.nononsenseapps.feeder.openai.isOnDevicePrompt
+import com.nononsenseapps.feeder.openai.isOnDeviceSummary
 import com.nononsenseapps.feeder.ui.compose.theme.LocalDimens
 import kotlinx.coroutines.delay
 
@@ -274,10 +278,11 @@ private fun OpenAISectionEdit(
     val hasProvider = provider != AIProviderPreset.NONE
     val isTranslationOnlyProvider = provider.isTranslationOnly
     val needsApiKey = provider.needsApiKey
+    val isOnDevice = provider.isOnDevice
     val showsTranslationEndpoint = provider == AIProviderPreset.DEEPL
 
     LaunchedEffect(current, provider) {
-        if (provider != AIProviderPreset.NONE && provider != AIProviderPreset.LOCAL_TRANSLATION) {
+        if (provider != AIProviderPreset.NONE && provider != AIProviderPreset.LOCAL_TRANSLATION && !isOnDevice) {
             delay(750)
             latestOnEvent(OpenAISettingsEvent.LoadModels(settings = current))
         }
@@ -335,6 +340,21 @@ private fun OpenAISectionEdit(
             },
         )
 
+        if (isOnDevice) {
+            Text(
+                text =
+                    stringResource(
+                        if (provider == AIProviderPreset.ON_DEVICE_PROMPT) {
+                            R.string.on_device_ai_info_prompt
+                        } else {
+                            R.string.on_device_ai_info_summary
+                        },
+                    ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+            )
+        }
+
         if (hasProvider && needsApiKey) {
             TextField(
                 modifier = Modifier.fillMaxWidth(),
@@ -368,7 +388,7 @@ private fun OpenAISectionEdit(
             )
         }
 
-        if (hasProvider && !isTranslationOnlyProvider) {
+        if (hasProvider && !isTranslationOnlyProvider && !isOnDevice) {
             TextField(
                 modifier = Modifier.fillMaxWidth(),
                 value = current.modelId,
@@ -420,7 +440,7 @@ private fun OpenAISectionEdit(
             )
         }
 
-        if (hasProvider && !isTranslationOnlyProvider) {
+        if (hasProvider && !isTranslationOnlyProvider && !isOnDevice) {
             TextField(
                 modifier = Modifier.fillMaxWidth(),
                 value = current.baseUrl,
@@ -491,7 +511,7 @@ private fun OpenAISectionEdit(
             )
         }
 
-        if (hasProvider && provider != AIProviderPreset.LOCAL_TRANSLATION) {
+        if (hasProvider && provider != AIProviderPreset.LOCAL_TRANSLATION && !isOnDevice) {
             TextField(
                 modifier = Modifier.fillMaxWidth(),
                 value = timeoutString,
@@ -746,6 +766,7 @@ private enum class AIProviderPreset(
     val isTranslationOnly: Boolean,
     val needsApiKey: Boolean,
     val endpoint: String,
+    val isOnDevice: Boolean = false,
 ) {
     NONE(
         titleRes = R.string.provider_none,
@@ -792,6 +813,26 @@ private enum class AIProviderPreset(
         needsApiKey = false,
         endpoint = "",
     ),
+    ON_DEVICE_PROMPT(
+        titleRes = R.string.provider_on_device_prompt,
+        supportsSummary = true,
+        supportsTranslation = false,
+        isDeepL = false,
+        isTranslationOnly = false,
+        needsApiKey = false,
+        endpoint = "",
+        isOnDevice = true,
+    ),
+    ON_DEVICE_SUMMARY(
+        titleRes = R.string.provider_on_device_summary,
+        supportsSummary = true,
+        supportsTranslation = false,
+        isDeepL = false,
+        isTranslationOnly = false,
+        needsApiKey = false,
+        endpoint = "",
+        isOnDevice = true,
+    ),
     ;
 
     fun applyTo(settings: OpenAISettings): OpenAISettings =
@@ -833,6 +874,24 @@ private enum class AIProviderPreset(
                     azureApiVersion = "",
                     azureDeploymentId = "",
                 )
+
+            ON_DEVICE_PROMPT ->
+                settings.copy(
+                    key = "",
+                    modelId = "",
+                    baseUrl = ON_DEVICE_PROMPT_PROVIDER_URL,
+                    azureApiVersion = "",
+                    azureDeploymentId = "",
+                )
+
+            ON_DEVICE_SUMMARY ->
+                settings.copy(
+                    key = "",
+                    modelId = "",
+                    baseUrl = ON_DEVICE_SUMMARY_PROVIDER_URL,
+                    azureApiVersion = "",
+                    azureDeploymentId = "",
+                )
         }
 
     companion object {
@@ -849,6 +908,8 @@ private enum class AIProviderPreset(
                 settings.isBlankConfiguration -> NONE
                 settings.baseUrl.contains("openai.azure.com", ignoreCase = true) -> AZURE_OPENAI
                 settings.isLocalTranslation -> LOCAL_TRANSLATION
+                settings.isOnDevicePrompt -> ON_DEVICE_PROMPT
+                settings.isOnDeviceSummary -> ON_DEVICE_SUMMARY
                 settings.isDeepL -> DEEPL
                 else -> OPENAI_COMPATIBLE
             }
@@ -966,6 +1027,8 @@ private fun OpenAISettings.validationMessage(
         }
 
         AIProviderPreset.LOCAL_TRANSLATION -> null
+        AIProviderPreset.ON_DEVICE_PROMPT -> null
+        AIProviderPreset.ON_DEVICE_SUMMARY -> null
     }
 }
 

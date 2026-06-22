@@ -82,12 +82,12 @@ fun SyncSelectionScreen(
     ) { padding ->
         SyncSelectionContent(
             viewState = viewState,
-            onSyncSettingsEnabled = viewModel::setSyncSettingsEnabled,
-            onSyncFeedsEnabled = viewModel::setSyncFeedsEnabled,
-            onCategorySynced = viewModel::setCategorySynced,
-            onSettingSynced = viewModel::setSettingSynced,
-            onTagSynced = viewModel::setTagSynced,
-            onFeedSynced = viewModel::setFeedSynced,
+            onSyncSettingsChange = viewModel::setSyncSettingsEnabled,
+            onSyncFeedsChange = viewModel::setSyncFeedsEnabled,
+            onCategoryChange = viewModel::setCategorySynced,
+            onSettingChange = viewModel::setSettingSynced,
+            onTagChange = viewModel::setTagSynced,
+            onFeedChange = viewModel::setFeedSynced,
             modifier =
                 Modifier
                     .padding(padding)
@@ -99,18 +99,19 @@ fun SyncSelectionScreen(
 @Composable
 fun SyncSelectionContent(
     viewState: SyncSelectionViewState,
-    onSyncSettingsEnabled: (Boolean) -> Unit,
-    onSyncFeedsEnabled: (Boolean) -> Unit,
-    onCategorySynced: (SyncSettingCategory, Boolean) -> Unit,
-    onSettingSynced: (String, Boolean) -> Unit,
-    onTagSynced: (String, Boolean) -> Unit,
-    onFeedSynced: (String, Boolean) -> Unit,
+    onSyncSettingsChange: (Boolean) -> Unit,
+    onSyncFeedsChange: (Boolean) -> Unit,
+    onCategoryChange: (SyncSettingCategory, Boolean) -> Unit,
+    onSettingChange: (String, Boolean) -> Unit,
+    onTagChange: (String, Boolean) -> Unit,
+    onFeedChange: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val dimens = LocalDimens.current
     val scrollState = rememberScrollState()
     // Collapsed by default - the fine-grained tree is hidden behind expand/collapse.
     val expanded = remember { mutableStateMapOf<String, Boolean>() }
+
     fun toggleExpanded(id: String) {
         expanded[id] = !(expanded[id] ?: false)
     }
@@ -139,7 +140,7 @@ fun SyncSelectionContent(
             MasterRow(
                 title = stringResource(R.string.sync_selection_settings),
                 enabled = viewState.syncSettingsEnabled,
-                onEnabledChange = onSyncSettingsEnabled,
+                onEnabledChange = onSyncSettingsChange,
                 expanded = expanded["settings"] ?: false,
                 onExpandToggle = { toggleExpanded("settings") },
             )
@@ -150,7 +151,7 @@ fun SyncSelectionContent(
                         title = stringResource(category.category.titleRes),
                         triState = category.triState,
                         enabled = viewState.syncSettingsEnabled,
-                        onToggle = { onCategorySynced(category.category, it) },
+                        onToggle = { onCategoryChange(category.category, it) },
                         expanded = expanded[catId] ?: false,
                         onExpandToggle = { toggleExpanded(catId) },
                     )
@@ -160,7 +161,7 @@ fun SyncSelectionContent(
                                 title = leaf.label,
                                 checked = leaf.synced,
                                 enabled = viewState.syncSettingsEnabled,
-                                onCheckedChange = { onSettingSynced(leaf.key, it) },
+                                onCheckedChange = { onSettingChange(leaf.key, it) },
                             )
                         }
                     }
@@ -173,7 +174,7 @@ fun SyncSelectionContent(
             MasterRow(
                 title = stringResource(R.string.sync_selection_feeds),
                 enabled = viewState.syncFeedsEnabled,
-                onEnabledChange = onSyncFeedsEnabled,
+                onEnabledChange = onSyncFeedsChange,
                 expanded = expanded["feeds"] ?: false,
                 onExpandToggle = { toggleExpanded("feeds") },
             )
@@ -193,7 +194,7 @@ fun SyncSelectionContent(
                         title = tagLabel,
                         triState = tagNode.triState,
                         enabled = viewState.syncFeedsEnabled,
-                        onToggle = { onTagSynced(tagNode.tag, it) },
+                        onToggle = { onTagChange(tagNode.tag, it) },
                         expanded = expanded[tagId] ?: false,
                         onExpandToggle = { toggleExpanded(tagId) },
                     )
@@ -203,7 +204,7 @@ fun SyncSelectionContent(
                                 title = feed.title,
                                 checked = feed.synced,
                                 enabled = viewState.syncFeedsEnabled,
-                                onCheckedChange = { onFeedSynced(feed.url, it) },
+                                onCheckedChange = { onFeedChange(feed.url, it) },
                             )
                         }
                     }
@@ -346,12 +347,12 @@ private fun SyncSelectionPreview() {
                             ),
                         ),
                 ),
-            onSyncSettingsEnabled = {},
-            onSyncFeedsEnabled = {},
-            onCategorySynced = { _, _ -> },
-            onSettingSynced = { _, _ -> },
-            onTagSynced = { _, _ -> },
-            onFeedSynced = { _, _ -> },
+            onSyncSettingsChange = {},
+            onSyncFeedsChange = {},
+            onCategoryChange = { _, _ -> },
+            onSettingChange = { _, _ -> },
+            onTagChange = { _, _ -> },
+            onFeedChange = { _, _ -> },
         )
     }
 }

@@ -209,8 +209,10 @@ android {
 androidComponents {
     beforeVariants { variantBuilder ->
         if (variantBuilder.buildType == "debug") {
-            // Only allow debug build of fdroid flavor
-            variantBuilder.enable = variantBuilder.productFlavors.containsAll(listOf("store" to "fdroid"))
+            // Allow debug builds of the fdroid and play flavors. The play debug build is needed to
+            // test the on-device (Gemini Nano / AICore) summarization, which is play-flavor only.
+            val storeFlavor = variantBuilder.productFlavors.firstOrNull { it.first == "store" }?.second
+            variantBuilder.enable = storeFlavor == "fdroid" || storeFlavor == "play"
         }
     }
 }
@@ -278,6 +280,13 @@ dependencies {
     androidTestImplementation(libs.bundles.android.test)
 
     debugImplementation(libs.compose.ui.test.manifest)
+
+    // On-device GenAI (Gemini Nano via AICore). PROPRIETARY Google libraries, so they are added to
+    // the `play` flavor ONLY - the `fdroid` flavor stays fully FOSS and ships a no-op stub instead.
+    "playImplementation"("com.google.mlkit:genai-prompt:1.0.0-beta2")
+    "playImplementation"("com.google.mlkit:genai-summarization:1.0.0-beta1")
+    // ListenableFuture.await() for the Summarization API's Futures-based calls.
+    "playImplementation"("androidx.concurrent:concurrent-futures-ktx:1.2.0")
 }
 
 fun getListOfSupportedLocales(): List<String> {

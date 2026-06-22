@@ -8,6 +8,8 @@ import androidx.lifecycle.application
 import androidx.lifecycle.viewModelScope
 import com.nononsenseapps.feeder.ApplicationCoroutineScope
 import com.nononsenseapps.feeder.R
+import com.nononsenseapps.feeder.aicore.OnDeviceAiMode
+import com.nononsenseapps.feeder.aicore.OnDeviceSummarizer
 import com.nononsenseapps.feeder.archmodel.Article
 import com.nononsenseapps.feeder.archmodel.Enclosure
 import com.nononsenseapps.feeder.archmodel.LinkOpener
@@ -41,6 +43,8 @@ import com.nononsenseapps.feeder.model.html.LinearArticle
 import com.nononsenseapps.feeder.openai.OpenAIApi
 import com.nononsenseapps.feeder.openai.canSummarize
 import com.nononsenseapps.feeder.openai.canUseAsTranslationApi
+import com.nononsenseapps.feeder.openai.isOnDevicePrompt
+import com.nononsenseapps.feeder.openai.isOnDeviceSummary
 import com.nononsenseapps.feeder.ui.compose.text.htmlToAnnotatedString
 import com.nononsenseapps.feeder.ui.text.MarkdownToHtmlConverter
 import com.nononsenseapps.feeder.util.Either
@@ -75,6 +79,7 @@ class ArticleViewModel(
     private val fullTextParser: FullTextParser by instance()
     private val filePathProvider: FilePathProvider by instance()
     private val openAIApi: OpenAIApi by instance()
+    private val onDeviceSummarizer: OnDeviceSummarizer by instance()
     private val toastMaker: ToastMaker by instance()
     private val translationManager: TranslationManager by instance()
 
@@ -522,14 +527,39 @@ class ArticleViewModel(
             try {
                 openAiSummary.value = OpenAISummaryState.Loading
                 val content = loadArticleContent()
-                val feed = articleFlow.value?.item?.feedId?.let { repository.getFeed(it) }
+                val feed =
+                    articleFlow.value
+                        ?.item
+                        ?.feedId
+                        ?.let { repository.getFeed(it) }
                 val customInstruction = repository.resolveSummaryPrompt(feed)
+                val settings = repository.openAISettings.value
                 val summaryResult =
-                    openAIApi.summarize(
-                        content = content,
-                        settings = repository.openAISettings.value,
-                        customInstruction = customInstruction,
-                    )
+                    when {
+                        settings.isOnDevicePrompt ->
+                            onDeviceSummarizer.summarize(
+                                content = content,
+                                mode = OnDeviceAiMode.PROMPT,
+                                customInstruction = customInstruction,
+                                appLang = Locale.getDefault().language,
+                            )
+
+                        settings.isOnDeviceSummary ->
+                            onDeviceSummarizer.summarize(
+                                content = content,
+                                // Summarization API ignores custom prompts (fixed bullet output).
+                                mode = OnDeviceAiMode.SUMMARY,
+                                customInstruction = "",
+                                appLang = Locale.getDefault().language,
+                            )
+
+                        else ->
+                            openAIApi.summarize(
+                                content = content,
+                                settings = settings,
+                                customInstruction = customInstruction,
+                            )
+                    }
                 val annotatedStrings = convertSummaryToAnnotatedStrings(summaryResult)
                 openAiSummary.value =
                     OpenAISummaryState.Result(

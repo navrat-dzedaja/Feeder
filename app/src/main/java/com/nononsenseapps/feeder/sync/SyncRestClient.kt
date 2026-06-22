@@ -789,9 +789,10 @@ class SyncRestClient(
                 { error -> if (error.code == 404) null else emptyMap() },
                 { response ->
                     runCatching {
-                        settingsAdapter.fromJson(
-                            AesCbcWithIntegrity.decryptString(response.encrypted, secretKeys = secretKey),
-                        )?.settings
+                        settingsAdapter
+                            .fromJson(
+                                AesCbcWithIntegrity.decryptString(response.encrypted, secretKeys = secretKey),
+                            )?.settings
                     }.getOrNull() ?: emptyMap()
                 },
             )
@@ -811,9 +812,10 @@ class SyncRestClient(
                 { emptyList() },
                 { response ->
                     runCatching {
-                        feedsAdapter.fromJson(
-                            AesCbcWithIntegrity.decryptString(response.encrypted, secretKeys = secretKey),
-                        )?.feeds
+                        feedsAdapter
+                            .fromJson(
+                                AesCbcWithIntegrity.decryptString(response.encrypted, secretKeys = secretKey),
+                            )?.feeds
                     }.getOrNull() ?: emptyList()
                 },
             )
