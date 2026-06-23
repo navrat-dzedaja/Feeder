@@ -8,6 +8,7 @@ import androidx.lifecycle.application
 import androidx.lifecycle.viewModelScope
 import com.nononsenseapps.feeder.ApplicationCoroutineScope
 import com.nononsenseapps.feeder.R
+import com.nononsenseapps.feeder.aicore.LlamaCppSummarizer
 import com.nononsenseapps.feeder.aicore.OnDeviceAiMode
 import com.nononsenseapps.feeder.aicore.OnDeviceSummarizer
 import com.nononsenseapps.feeder.archmodel.Article
@@ -43,6 +44,7 @@ import com.nononsenseapps.feeder.model.html.LinearArticle
 import com.nononsenseapps.feeder.openai.OpenAIApi
 import com.nononsenseapps.feeder.openai.canSummarize
 import com.nononsenseapps.feeder.openai.canUseAsTranslationApi
+import com.nononsenseapps.feeder.openai.isLlamaCpp
 import com.nononsenseapps.feeder.openai.isOnDevicePrompt
 import com.nononsenseapps.feeder.openai.isOnDeviceSummary
 import com.nononsenseapps.feeder.ui.compose.text.htmlToAnnotatedString
@@ -80,6 +82,7 @@ class ArticleViewModel(
     private val filePathProvider: FilePathProvider by instance()
     private val openAIApi: OpenAIApi by instance()
     private val onDeviceSummarizer: OnDeviceSummarizer by instance()
+    private val llamaCppSummarizer: LlamaCppSummarizer by instance()
     private val toastMaker: ToastMaker by instance()
     private val translationManager: TranslationManager by instance()
 
@@ -550,6 +553,14 @@ class ArticleViewModel(
                                 // Summarization API ignores custom prompts (fixed bullet output).
                                 mode = OnDeviceAiMode.SUMMARY,
                                 customInstruction = "",
+                                appLang = Locale.getDefault().language,
+                            )
+
+                        settings.isLlamaCpp ->
+                            llamaCppSummarizer.summarize(
+                                content = content,
+                                customInstruction = customInstruction,
+                                modelPath = repository.llamaCppModelPath.value,
                                 appLang = Locale.getDefault().language,
                             )
 

@@ -330,6 +330,14 @@
   <string name="provider_on_device_summary">On-device · ML Kit Summary</string>
   <string name="on_device_ai_info_prompt">Runs on your device with Gemini Nano (AICore) — no data leaves the phone. Uses your custom prompts. Needs a supported device; the model downloads on first use.</string>
   <string name="on_device_ai_info_summary">Runs on your device with Gemini Nano (AICore) — no data leaves the phone. Produces fixed bullet summaries, so custom prompts are ignored. English, Japanese and Korean only.</string>
+  <string name="provider_on_device_llamacpp">On-device · llama.cpp (open source)</string>
+  <string name="on_device_ai_info_llamacpp">Runs fully on your device with llama.cpp — no data leaves the phone and it works in every build (no Google services needed). Uses your custom prompts. Pick a GGUF model file below; small quantized models work best on a phone.</string>
+  <string name="llamacpp_select_model">Select model file (.gguf)</string>
+  <string name="llamacpp_no_model_selected">No model selected yet.</string>
+  <string name="llamacpp_current_model">Current model: %1$s</string>
+  <string name="llamacpp_importing_model">Importing model, this can take a while…</string>
+  <string name="llamacpp_model_ready">On-device model ready.</string>
+  <string name="llamacpp_model_import_failed">Could not import the model file.</string>
   <string name="on_device_ai_status_unsupported_build">On-device AI is not bundled in this build. Install the Google Play build to use it.</string>
   <string name="on_device_ai_status_unavailable">Not supported on this device.</string>
   <string name="on_device_ai_status_downloadable">Supported. The model will download on first use.</string>

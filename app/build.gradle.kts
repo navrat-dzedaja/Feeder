@@ -35,6 +35,16 @@ android {
             .get()
             .toInt()
 
+    // On-device llama.cpp (native, FOSS) - see app/src/main/cpp/CMakeLists.txt + the llama.cpp submodule.
+    ndkVersion = "27.2.12479018"
+
+    externalNativeBuild {
+        cmake {
+            path("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.nononsenseapps.feeder"
         // The version fields are set with actual values to support F-Droid
@@ -55,6 +65,24 @@ android {
 
         // For espresso tests
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Only build the native llama.cpp lib for the phone ABI to keep build times sane.
+        // (Add "x86_64" here if you want it to run on an emulator.)
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
+        externalNativeBuild {
+            cmake {
+                arguments += "-DCMAKE_BUILD_TYPE=Release"
+                arguments += "-DBUILD_SHARED_LIBS=ON"
+                arguments += "-DLLAMA_BUILD_APP=OFF"
+                arguments += "-DLLAMA_BUILD_COMMON=ON"
+                arguments += "-DLLAMA_OPENSSL=OFF"
+                arguments += "-DGGML_NATIVE=OFF"
+                arguments += "-DGGML_OPENMP=OFF"
+                arguments += "-DGGML_LLAMAFILE=OFF"
+            }
+        }
     }
 
     dependenciesInfo {
@@ -240,6 +268,10 @@ configurations.all {
 // so need to specify to make it compatible with compose rules
 ktlint {
     version.set("1.5.0")
+    // Vendored, version-matched llama.cpp Android engine (com.arm.aichat) - keep its upstream style.
+    filter {
+        exclude("**/com/arm/aichat/**")
+    }
 }
 
 dependencies {

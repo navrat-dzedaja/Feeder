@@ -196,6 +196,9 @@ class OpenAIApi(
         if (settings.isOnDevice) {
             return SummaryResult.Error(content = "On-device summarization is handled by the on-device summarizer")
         }
+        if (settings.isLlamaCpp) {
+            return SummaryResult.Error(content = "On-device summarization is handled by the llama.cpp summarizer")
+        }
         try {
             val response =
                 openAIClientFactory(settings).chatCompletion(
@@ -398,9 +401,13 @@ val OpenAISettings.isOnDeviceSummary: Boolean
 val OpenAISettings.isOnDevice: Boolean
     get() = isOnDevicePrompt || isOnDeviceSummary
 
+/** On-device llama.cpp (GGUF) — fully FOSS, available in both flavors. Honours custom prompts. */
+val OpenAISettings.isLlamaCpp: Boolean
+    get() = baseUrl == LLAMACPP_PROVIDER_URL
+
 val OpenAISettings.isValid: Boolean
     get() =
-        if (isLocalTranslation || isOnDevice) {
+        if (isLocalTranslation || isOnDevice || isLlamaCpp) {
             true
         } else if (isDeepL) {
             key.isNotEmpty()
@@ -525,3 +532,4 @@ private fun OpenAISettings.normalizedDeepLBaseUrl(): String {
 const val LOCAL_TRANSLATION_PROVIDER_URL = "local://translation"
 const val ON_DEVICE_PROMPT_PROVIDER_URL = "local://aicore-prompt"
 const val ON_DEVICE_SUMMARY_PROVIDER_URL = "local://aicore-summary"
+const val LLAMACPP_PROVIDER_URL = "local://llamacpp"

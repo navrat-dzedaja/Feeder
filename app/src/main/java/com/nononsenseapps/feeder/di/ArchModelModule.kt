@@ -1,6 +1,7 @@
 package com.nononsenseapps.feeder.di
 
 import android.app.Application
+import com.nononsenseapps.feeder.aicore.LlamaCppSummarizer
 import com.nononsenseapps.feeder.aicore.OnDeviceSummarizer
 import com.nononsenseapps.feeder.aicore.OnDeviceSummarizerImpl
 import com.nononsenseapps.feeder.archmodel.FeedItemStore
@@ -56,6 +57,7 @@ val archModelModule =
         bind<OPMLParserHandler>() with singleton { OPMLImporter(di) }
         bind<LocalTranslator>() with singleton { LocalTranslator(di) }
         bind<OnDeviceSummarizer>() with singleton { OnDeviceSummarizerImpl(di) }
+        bind<LlamaCppSummarizer>() with singleton { LlamaCppSummarizer(di) }
         bind<TranslationManager>() with singleton { TranslationManager(di) }
         bindFactory<OpenAISettings, OpenAIClient> { settings -> OpenAIClientDefault(settings) }
         bind<OpenAIApi>() with singleton { OpenAIApi(appLang = Locale.getDefault().getISO3Language(), factory()) }

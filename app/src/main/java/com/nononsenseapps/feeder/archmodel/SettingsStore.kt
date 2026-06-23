@@ -603,6 +603,15 @@ class SettingsStore(
         sp.edit().putString(PREF_SUMMARY_PROMPT, value).apply()
     }
 
+    private val _llamaCppModelPath =
+        MutableStateFlow(sp.getStringNonNull(PREF_LLAMACPP_MODEL_PATH, ""))
+    val llamaCppModelPath: StateFlow<String> = _llamaCppModelPath.asStateFlow()
+
+    fun setLlamaCppModelPath(value: String) {
+        _llamaCppModelPath.value = value
+        sp.edit().putString(PREF_LLAMACPP_MODEL_PATH, value).apply()
+    }
+
     private val _summaryPromptsByTag = MutableStateFlow(readSummaryPromptsByTag())
     val summaryPromptsByTag: StateFlow<Map<String, String>> = _summaryPromptsByTag.asStateFlow()
 
@@ -848,6 +857,12 @@ const val PREF_OPENAI_REQUEST_TIMEOUT_SECONDS = "pref_openai_request_timeout_sec
  */
 const val PREF_SUMMARY_PROMPT = "pref_summary_prompt"
 const val PREF_SUMMARY_PROMPT_BY_TAG = "pref_summary_prompt_by_tag"
+
+/**
+ * Local filesystem path to the GGUF model used by the on-device llama.cpp summarizer.
+ * Device-specific (a real file path) so it is intentionally NOT part of [UserSettings] / sync.
+ */
+const val PREF_LLAMACPP_MODEL_PATH = "pref_llamacpp_model_path"
 
 // Keep the legacy persisted key name for preference and OPML compatibility.
 const val PREF_PREFERRED_TRANSLATION_LANGUAGE = "pref_openai_translation_language"

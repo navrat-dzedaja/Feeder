@@ -1,11 +1,16 @@
 package com.nononsenseapps.feeder.ui.compose.settings
 
 import android.app.Application
+import android.net.Uri
 import android.os.PowerManager
+import android.provider.OpenableColumns
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.runtime.Immutable
 import androidx.core.content.getSystemService
 import androidx.lifecycle.viewModelScope
 import com.nononsenseapps.feeder.ApplicationCoroutineScope
+import com.nononsenseapps.feeder.R
 import com.nononsenseapps.feeder.archmodel.DarkThemePreferences
 import com.nononsenseapps.feeder.archmodel.FeedItemStyle
 import com.nononsenseapps.feeder.archmodel.ItemOpener
@@ -32,8 +37,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.kodein.di.DI
 import org.kodein.di.instance
+import java.io.File
 
 class SettingsViewModel(
     di: DI,
@@ -272,6 +279,7 @@ class SettingsViewModel(
                 repository.font,
                 repository.isPagingMode,
                 repository.isAnimatedPaging,
+                repository.llamaCppModelPath,
             ) { params: Array<Any> ->
                 @Suppress("UNCHECKED_CAST")
                 SettingsViewState(
@@ -306,6 +314,7 @@ class SettingsViewModel(
                         _viewState.value.summaryAIState.copy(
                             settings = params[27] as OpenAISettings,
                             modelsResult = params[28] as OpenAIModelsState,
+                            llamaCppModelPath = params[38] as String,
                         ),
                     translationApiState =
                         _viewState.value.translationApiState.copy(
@@ -364,8 +373,54 @@ class SettingsViewModel(
                 val current = currentState()
                 updateState(current.copy(showModelsError = event.show))
             }
+            is OpenAISettingsEvent.ImportLlamaCppModel -> importLlamaCppModel(event.uri)
         }
     }
+
+    /**
+     * Copies a user-picked GGUF file into app-private storage and records its path. The native
+     * llama.cpp engine loads from a real filesystem path, so we cannot use the SAF content:// URI
+     * directly. Runs on [applicationCoroutineScope] so it survives the settings screen closing.
+     */
+    private fun importLlamaCppModel(uri: Uri) {
+        applicationCoroutineScope.launch(Dispatchers.IO) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, context.getString(R.string.llamacpp_importing_model), Toast.LENGTH_SHORT).show()
+            }
+            val result =
+                runCatching {
+                    val name = queryDisplayName(uri).ifBlank { "model.gguf" }
+                    val modelsDir = File(context.filesDir, "models").apply { mkdirs() }
+                    // These files are large (often several GB); keep only the latest pick.
+                    modelsDir.listFiles()?.forEach { it.delete() }
+                    val dest = File(modelsDir, name)
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        dest.outputStream().use { output -> input.copyTo(output) }
+                    } ?: error("Could not open the selected file")
+                    dest.absolutePath
+                }
+            withContext(Dispatchers.Main) {
+                result
+                    .onSuccess { path ->
+                        repository.setLlamaCppModelPath(path)
+                        Toast.makeText(context, context.getString(R.string.llamacpp_model_ready), Toast.LENGTH_SHORT).show()
+                    }.onFailure { e ->
+                        Log.e(LOG_TAG, "Failed to import GGUF model", e)
+                        Toast.makeText(context, context.getString(R.string.llamacpp_model_import_failed), Toast.LENGTH_LONG).show()
+                    }
+            }
+        }
+    }
+
+    private fun queryDisplayName(uri: Uri): String =
+        runCatching {
+            context.contentResolver
+                .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { cursor ->
+                    val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (cursor.moveToFirst() && idx >= 0) cursor.getString(idx) else null
+                }
+        }.getOrNull().orEmpty()
 
     companion object {
         @Suppress("unused")
@@ -425,6 +480,8 @@ data class OpenAISettingsState(
     val modelsResult: OpenAIModelsState = OpenAIModelsState.None,
     val isEditMode: Boolean = false,
     val showModelsError: Boolean = false,
+    /** Path to the selected on-device llama.cpp GGUF model (empty if none picked yet). */
+    val llamaCppModelPath: String = "",
 )
 
 sealed interface OpenAIModelsState {
@@ -460,6 +517,11 @@ sealed interface OpenAISettingsEvent {
 
     data class ShowModelsError(
         val show: Boolean,
+    ) : OpenAISettingsEvent
+
+    /** Picked a .gguf file (via SAF) to use as the on-device llama.cpp model. */
+    data class ImportLlamaCppModel(
+        val uri: Uri,
     ) : OpenAISettingsEvent
 }
 

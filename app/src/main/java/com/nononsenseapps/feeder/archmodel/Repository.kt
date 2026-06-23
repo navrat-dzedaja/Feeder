@@ -380,6 +380,10 @@ class Repository(
 
     fun setAppSummaryPrompt(value: String) = settingsStore.setAppSummaryPrompt(value)
 
+    val llamaCppModelPath = settingsStore.llamaCppModelPath
+
+    fun setLlamaCppModelPath(value: String) = settingsStore.setLlamaCppModelPath(value)
+
     val summaryPromptsByTag = settingsStore.summaryPromptsByTag
 
     fun summaryPromptForTag(tag: String): String = settingsStore.summaryPromptForTag(tag)

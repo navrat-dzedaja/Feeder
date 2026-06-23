@@ -1,6 +1,9 @@
 package com.nononsenseapps.feeder.ui.compose.settings
 
 import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,12 +62,14 @@ import androidx.compose.ui.window.DialogProperties
 import com.aallam.openai.client.OpenAIHost
 import com.nononsenseapps.feeder.R
 import com.nononsenseapps.feeder.archmodel.OpenAISettings
+import com.nononsenseapps.feeder.openai.LLAMACPP_PROVIDER_URL
 import com.nononsenseapps.feeder.openai.LOCAL_TRANSLATION_PROVIDER_URL
 import com.nononsenseapps.feeder.openai.ON_DEVICE_PROMPT_PROVIDER_URL
 import com.nononsenseapps.feeder.openai.ON_DEVICE_SUMMARY_PROVIDER_URL
 import com.nononsenseapps.feeder.openai.canUseAsTranslationApi
 import com.nononsenseapps.feeder.openai.isBlankConfiguration
 import com.nononsenseapps.feeder.openai.isDeepL
+import com.nononsenseapps.feeder.openai.isLlamaCpp
 import com.nononsenseapps.feeder.openai.isLocalTranslation
 import com.nononsenseapps.feeder.openai.isOnDevicePrompt
 import com.nononsenseapps.feeder.openai.isOnDeviceSummary
@@ -143,6 +148,7 @@ fun OpenAISection(
                         validationMessage = validationMessage,
                         preferredTranslationLanguage = currentPreferredTranslationLanguage,
                         showModelsError = state.showModelsError,
+                        llamaCppModelPath = state.llamaCppModelPath,
                         onEvent = {
                             if (it is OpenAISettingsEvent.UpdateSettings) {
                                 current = it.settings
@@ -268,6 +274,7 @@ private fun OpenAISectionEdit(
     validationMessage: String?,
     preferredTranslationLanguage: String,
     showModelsError: Boolean,
+    llamaCppModelPath: String,
     onEvent: (OpenAISettingsEvent) -> Unit,
     onProviderChange: (AIProviderPreset) -> Unit,
     onPreferredTranslationLanguageChange: (String) -> Unit,
@@ -344,14 +351,21 @@ private fun OpenAISectionEdit(
             Text(
                 text =
                     stringResource(
-                        if (provider == AIProviderPreset.ON_DEVICE_PROMPT) {
-                            R.string.on_device_ai_info_prompt
-                        } else {
-                            R.string.on_device_ai_info_summary
+                        when (provider) {
+                            AIProviderPreset.ON_DEVICE_PROMPT -> R.string.on_device_ai_info_prompt
+                            AIProviderPreset.ON_DEVICE_LLAMACPP -> R.string.on_device_ai_info_llamacpp
+                            else -> R.string.on_device_ai_info_summary
                         },
                     ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
+            )
+        }
+
+        if (provider.isLlamaCpp) {
+            LlamaCppModelPicker(
+                modelPath = llamaCppModelPath,
+                onPick = { uri -> onEvent(OpenAISettingsEvent.ImportLlamaCppModel(uri)) },
             )
         }
 
@@ -758,6 +772,32 @@ private fun OpenAIModelsStatus(
     }
 }
 
+@Composable
+private fun LlamaCppModelPicker(
+    modelPath: String,
+    onPick: (Uri) -> Unit,
+) {
+    val launcher =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri?.let(onPick)
+        }
+    val modelName = remember(modelPath) { modelPath.substringAfterLast('/') }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text =
+                if (modelName.isBlank()) {
+                    stringResource(R.string.llamacpp_no_model_selected)
+                } else {
+                    stringResource(R.string.llamacpp_current_model, modelName)
+                },
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Button(onClick = { launcher.launch(arrayOf("*/*")) }) {
+            Text(text = stringResource(R.string.llamacpp_select_model))
+        }
+    }
+}
+
 private enum class AIProviderPreset(
     val titleRes: Int,
     val supportsSummary: Boolean,
@@ -767,6 +807,7 @@ private enum class AIProviderPreset(
     val needsApiKey: Boolean,
     val endpoint: String,
     val isOnDevice: Boolean = false,
+    val isLlamaCpp: Boolean = false,
 ) {
     NONE(
         titleRes = R.string.provider_none,
@@ -833,6 +874,17 @@ private enum class AIProviderPreset(
         endpoint = "",
         isOnDevice = true,
     ),
+    ON_DEVICE_LLAMACPP(
+        titleRes = R.string.provider_on_device_llamacpp,
+        supportsSummary = true,
+        supportsTranslation = false,
+        isDeepL = false,
+        isTranslationOnly = false,
+        needsApiKey = false,
+        endpoint = "",
+        isOnDevice = true,
+        isLlamaCpp = true,
+    ),
     ;
 
     fun applyTo(settings: OpenAISettings): OpenAISettings =
@@ -892,6 +944,15 @@ private enum class AIProviderPreset(
                     azureApiVersion = "",
                     azureDeploymentId = "",
                 )
+
+            ON_DEVICE_LLAMACPP ->
+                settings.copy(
+                    key = "",
+                    modelId = "",
+                    baseUrl = LLAMACPP_PROVIDER_URL,
+                    azureApiVersion = "",
+                    azureDeploymentId = "",
+                )
         }
 
     companion object {
@@ -910,6 +971,7 @@ private enum class AIProviderPreset(
                 settings.isLocalTranslation -> LOCAL_TRANSLATION
                 settings.isOnDevicePrompt -> ON_DEVICE_PROMPT
                 settings.isOnDeviceSummary -> ON_DEVICE_SUMMARY
+                settings.isLlamaCpp -> ON_DEVICE_LLAMACPP
                 settings.isDeepL -> DEEPL
                 else -> OPENAI_COMPATIBLE
             }
@@ -1029,6 +1091,7 @@ private fun OpenAISettings.validationMessage(
         AIProviderPreset.LOCAL_TRANSLATION -> null
         AIProviderPreset.ON_DEVICE_PROMPT -> null
         AIProviderPreset.ON_DEVICE_SUMMARY -> null
+        AIProviderPreset.ON_DEVICE_LLAMACPP -> null
     }
 }
 
